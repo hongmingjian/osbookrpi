@@ -1,0 +1,27 @@
+OUTPUT_FORMAT("elf32-littlearm")
+OUTPUT_ARCH(arm)
+ENTRY(entry)
+SECTIONS {
+  . = 0x8000;
+  .text : {
+    *(.text)
+  }
+  . = ALIGN(4);
+  .rodata : {
+    *(.rodata)
+  }
+  .rdata : {
+    *(.rdata)
+  }
+  .data : {
+    *(.data)
+  }
+  . = ALIGN(4);
+  _edata = .;
+  .bss : {
+    *(.bss)
+    *(COMMON)
+  }
+  . = ALIGN(4);
+  _end = .;
+}

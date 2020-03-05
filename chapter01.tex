@@ -1,0 +1,48 @@
+\documentclass[main.tex]{subfiles}
+\onlyinsubfile{\usepackage{CJKutf8}}
+\begin{document}
+\begin{CJK*}{UTF8}{song}
+
+\chapter{准备工作}
+%% my chapter 1 content
+%\onlyinsubfile{this only appears if chapter1.tex is compiled (not when main.tex is compiled)}
+%\notinsubfile{this only appears if main.tex is compiled (not when chapter1.tex is compiled)}
+%% more of my chapter 1 content
+%%
+\section{树莓派介绍}
+
+\par
+树莓派（Raspberry pi，简写rpi）是一台卡片计算机，它由英国的树莓派基金会开发，目的是以低价硬件及自由软件促进计算机基础教育，培养孩子们在电子和编程方面的兴趣。从2012年开始，发布了A、B、B+、Zero、B2以及最新的B3版，价格在5-35美元之间。为了增加系统的“可玩性”，树莓派对外引出了几十个引脚，用户可以在电路级别与其他第三方系统连接，从而扩展了系统的功能。正是树莓派这种开放的硬件设计，它在电子爱好者、学生和教师中掀起了一阵DIY的风暴，通过树莓派与传统的硬件结合，创造了很多有趣且有用的项目。例如，它与无人机结合，用于无人机的控制；与家电结合，形成智能家居系统；通过外接屏幕和按钮，模拟传统的电子游戏机。不仅如此，作为一台功能完整的计算机，它也可以作为web服务器、文件服务器或者媒体播放器，甚至可以用几十上百台树莓派构建计算机群集。
+
+\par
+在软件方面，也遵循了同样的开放设计.树莓派基金会提供了raspbian，一个基于Debian的Linux发行版。官方提供稳定、持续更新的软件平台，是树莓派成功的关键因素之一。
+
+\par
+尽管树莓派拥有无限的应用前景，本书并不关注树莓派的应用。我们想把树莓派当作一台普通的计算机，学习运行于ARM架构上的操作系统。如今操作系统的开发，一般都是在虚拟机上面进行。尽管虚拟机是开发操作系统最好的平台之一，但是基于真实的物理机器来开发操作系统会带来控制物理世界的体验。而今天，基于物理PC机来学习操作系统，不仅开发效率低，而且很容易出错。树莓派具有物理机器的所有组件，而且它价格便宜、体积小，接口简单，正好适用于学习操作系统内核的设计和开发。由于IBM-PC采用x86或x64作为CPU，而且历史的原因造成x86的CPU设计相当复杂。IBM-PC由于兼容性问题，架构也很复杂，并不适合于初学者入门。相比之下，ARM的架构相对简单，容易上手，而且树莓派采用了SoC，单个芯片上集成了CPU、内存、GPU以及很多外设控制器，不存在IBM-PC中存在的各种兼容性问题。
+
+
+\section{开发环境}
+
+\subsection{硬件材料}
+\begin{itemize}
+\item 树莓派：本书采用目前主流的B版，因为芯片保持向后兼容，因此本书的内容也适用于B+、B2、B3版，以及同样采用BCM2835的zero版。树莓派采用博通（Broadcom）的SoC作为中央处理器，B2之前用BCM2835，是ARMv6架构的单核ARM1176JZF-S；B2用BCM2836，属于ARMv7架构，有四核心的Cortex-A7；B3用BCM2837，属于ARMv8架构的四核心Cortex-A53，首次采用64位核心。
+
+\item USB转串口小板和3根杜邦线：相比于显示器的输出，串口是最容易接收树莓派输出的接口。目前大部分计算机没有串口（也称为RS232、UART或COM口），而都配置了多个USB接口，因此需要一个USB转串口的小板，如图（c）所示。连接方法是将树莓派与小板的TxD与RxD对接，GND直连即可，如图所示。如果你用B+版本及其以后的树莓派，它提供了40个引脚，其中前26个与B+之前的版本是兼容的，所以串口的连接方法仍然如图所示。
+
+\includegraphics[scale=0.4]{3.png}
+
+\item 一张 （Micro）SD存储卡及其读卡器。
+
+\item 另外，开发过程中需要频繁给树莓派加电、断电，建议购买一根带开关的USB电源线，既提高了开发效率，也可以避免频繁拔插USB接口对其造成损害。
+\end{itemize}
+
+\subsection{软件工具}
+\begin{itemize}
+\item 首先，把SD卡格式化成FAT文件系统，然后从https://github.com/raspberrypi/firmware/下载bootcode.bin和start.elf两个文件并复制到SD卡的根目录下。bootcode.bin和start.elf分别是树莓派的第2、3阶段引导程序，它们的功能类似于IBM-PC上的BIOS。
+\item 根据你用于开发的操作系统，从https://launchpad.net/gcc-arm-embedded下载汇编器、编译器、链接器等开发工具并安装。
+\item 准备一个查看串口输出的工具，在Windows平台上，可以使用PuTTY；Linux或macOS可以使用minicom。
+\end{itemize}
+
+\clearpage
+\end{CJK*}
+\end{document} 

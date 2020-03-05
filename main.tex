@@ -1,0 +1,22 @@
+\documentclass{book}
+\usepackage{subfiles}
+\usepackage{CJKutf8}
+\usepackage{graphicx}
+\usepackage{minted} %  -shell-escape
+
+\newcommand{\onlyinsubfile}[1]{#1}
+\newcommand{\notinsubfile}[1]{}
+
+\begin{document}
+\begin{CJK*}{UTF8}{song}
+
+\renewcommand{\onlyinsubfile}[1]{}
+\renewcommand{\notinsubfile}[1]{#1}
+
+\subfile{chapter01}
+\subfile{chapter02}
+\subfile{chapter03}
+\subfile{chapter04}
+
+\end{CJK*}
+\end{document}

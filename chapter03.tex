@@ -1,0 +1,91 @@
+\documentclass[main.tex]{subfiles}
+\onlyinsubfile{\usepackage{CJKutf8}}
+\begin{document}
+\begin{CJK*}{UTF8}{song}
+
+\chapter{中断及异常处理}
+%% my chapter 1 content
+%\onlyinsubfile{this only appears if chapter1.tex is compiled (not when main.tex is compiled)}
+%\notinsubfile{this only appears if main.tex is compiled (not when chapter1.tex is compiled)}
+%% more of my chapter 1 content
+%%
+\section{介绍}
+ARM提供了7种模式，分别是user、system、supervisor、IRQ、FIQ、abort、undefined，其中除了user模式，其他6种模式都是特权模式。
+User : 唯一的非特权模式，用户程序运行在这种模式
+System:与用户模式一样，只是属于特权模式
+Supervisor：操作系统内核运行的模式，当CPU复位或swi指令执行时进入这种模式
+IRQ :   当一个普通中断产生时将会进入这种模式
+FIQ :   当一个快速中断产生时将会进入这种模式
+Abort : 当CPU访问内存出现异常时将会进入这种模式
+Undefined : 当CPU执行未定义指令时会进入这种模式
+本章主要讲解中断处理方法及流程。当外部设备触发中断时，ARM会取出异常向量表中的IRQ项，把控制传递给它。此时，CPSR=，中断前模式的CPSR保存在SPSR中，lr=中断返回地址，sp=；PC=；
+
+\section{扩充entry.S}
+1、	补充完整的异常向量表
+2、	因为引入了一些全局变量，我们需要初始化这些全局变量为零
+
+\inputminted[firstline=71,lastline=104,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+
+因为kernel.img被加载到0x8000这个地址，异常向量表放在0x8000，而CPU希望异常向量放在0地址。因此，我们要把异常向量表从0x8000复制到0x0地址，这样才能保证异常的正常处理。
+
+\inputminted[firstline=104,lastline=112,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+
+其次，未初始化的全局变量，全部要初始化为0.
+
+\inputminted[firstline=112,lastline=121,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+
+接下来，为各个异常模式设置栈。
+\inputminted[firstline=121,lastline=143,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+
+在实现操作系统内核的过程中，一般我们只用到两种模式：user和supervisor模式，user模式用于运行用户应用程序，supervisor模式用于运行操作系统内核。
+当系统被中断或发生异常时，CPU进入6种特权模式之一。我们完成一些准备工作后，快速进入supervisor模式，完成后续的流程。
+\inputminted[firstline=25,lastline=45,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{chapter03/kernel/machdep.h}
+
+
+\section{保存现场}
+当中断发生时，CPU进入IRQ模式，而且把PC设置为0x18，即从0x18位置开始响应中断。此时R13是IRQ模式的栈顶，（R14-4）保存了中断返回的地址，SPSR保存了中断前的CPSR，而且此时CPU不再响应IRQ中断。我们先在IRQ模式栈上预留12字节的空间，先把返回地址压到栈上，即
+
+\inputminted[firstline=39,lastline=41,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+
+好了，现在lr寄存器可以用来保存其他的数据。因此，我们先把SPSR也压到栈上
+\inputminted[firstline=42,lastline=43,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+我们怎么才能记住IRQ模式栈的位置，然后将来可以从中取出中断返回地址和SPSR呢？为此，我们约定一个通用寄存器保存IRQ模式栈的位置，然后将来可以取出来。而且这个通用寄存器不能受到模式切换的影响。为简单起见，我们就用R0。因为我们不能破坏R0的内容，因此先把R0的内容压到IRQ模式栈上，即
+\inputminted[firstline=44,lastline=46,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+先把R0压到栈上，然后让R0指向IRQ模式栈顶的位置。最后一条语句很重要，它还原了IRQ模式栈的位置，以保证下次发生IRQ中断时，IRQ模式栈始终是空的。好了，现在我们可以切换到SVC模式。
+\inputminted[firstline=47,lastline=50,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+此时，CPU已经切换到了SVC模式。我们把整个中断现场保存在SVC模式栈下面。所以，先为中断现场预留空间。然后把刚才保存在IRQ模式栈中的中断返回地址、SPSR和R0复制到SVC模式栈中，代码如下：
+\inputminted[firstline=51,lastline=57,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+现在，可以保存中断发生时所有其他的寄存器。
+\inputminted[firstline=58,lastline=61,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+
+\section{异常返回}
+当中断处理程序响应完成中断后，需要从中断函数返回到被中断的指令继续执行。
+\inputminted[firstline=64,lastline=69,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+保存中断现场比较复杂的原因在于必须原封不动地保持中断发生时的所有寄存器，ARM的模式相关的寄存器R13和R14起了很重要的过渡作用。
+至此，我们可以在SVC模式中处理中断
+\inputminted[firstline=145,lastline=151,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{chapter03/kernel/entry.S}
+其中g\_intr\_vector是中断向量表，包含了各个中断处理函数的地址。Irq\_handler的主要工作是获取中断源，然后中断向量表进行分发。
+\inputminted[firstline=83,lastline=117,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{chapter03/kernel/machdep.c}
+
+\section{中断控制器}
+中断控制器(PIC)是计算机重要的外设之一，它控制着其他外设如何中断CPU。
+\inputminted[firstline=42,lastline=51,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{chapter03/kernel/machdep.c}
+在系统启动过程中，我们希望关闭所有的中断，即不允许外部设备中断CPU。将来某个设备初始化完成后，我们再逐一打开它的中断，即允许它中断CPU。这是通过两个函数来控制，即enable\_irq和disable\_irq
+\inputminted[firstline=53,lastline=81,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{chapter03/kernel/machdep.c}
+
+\section{定时器中断}
+可编程定时器（Programmable Interval Timer，PIT）是计算机系统重要的外设之一，它以固定的频率中断CPU，以保护CPU不被应用程序长期挟持。BCM2835内部集成了一片定时器AP804，我们首先初始化定时器。Init\_pit的参数是中断CPU的频率。
+\inputminted[firstline=119,lastline=133,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{chapter03/kernel/machdep.c}
+调用init\_pit即可初始化定时器，让它以每秒钟freq的频率中断CPU。但是，仅仅初始化定时器还不够，我们还需要初始化中断控制器。
+下面我们来实现定时器的中断处理函数，定时器中断一次，往串口输出一个点。
+
+\inputminted[firstline=3,lastline=23,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{chapter03/kernel/kernel.c}
+
+现在，可以在cstart函数中初始化PIC和PIT，以及中断向量表，然后开启定时器中断。
+
+\inputminted[firstline=135,lastline=164,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{chapter03/kernel/machdep.c}
+运行结果如图所示，表明中断系统已经可以工作了。
+
+\clearpage
+\end{CJK*}
+\end{document} 
