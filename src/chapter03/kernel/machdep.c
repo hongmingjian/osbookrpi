@@ -45,9 +45,9 @@ void sys_putchar ( int c )
 static void init_pic()
 {
     intr_reg_t *pic = (intr_reg_t *)(MMIO_BASE_PA+INTR_REG);
-    pic->Disable_basic_IRQs = 0xff;
-    pic->Disable_IRQs_1 = 0xffffffff;
-    pic->Disable_IRQs_2 = 0xffffffff;
+    pic->disable_basic_irqs = 0xff;
+    pic->disable_irqs_1 = 0xffffffff;
+    pic->disable_irqs_2 = 0xffffffff;
 }
 
 /**
@@ -57,11 +57,11 @@ void enable_irq(uint32_t irq)
 {
     intr_reg_t *pic = (intr_reg_t *)(MMIO_BASE_PA+INTR_REG);
     if(irq  < 8) {
-        pic->Enable_basic_IRQs = 1 << irq;
+        pic->enable_basic_irqs = 1 << irq;
     } else if(irq < 40) {
-        pic->Enable_IRQs_1 = 1<<(irq - 8);
+        pic->enable_irqs_1 = 1<<(irq - 8);
     } else if(irq < 72) {
-        pic->Enable_IRQs_2 = 1<<(irq - 40);
+        pic->enable_irqs_2 = 1<<(irq - 40);
     }
 }
 
@@ -72,11 +72,11 @@ void disable_irq(uint32_t irq)
 {
     intr_reg_t *pic = (intr_reg_t *)(MMIO_BASE_PA+INTR_REG);
     if(irq  < 8) {
-        pic->Disable_basic_IRQs = 1 << irq;
+        pic->disable_basic_irqs = 1 << irq;
     } else if(irq < 40) {
-        pic->Disable_IRQs_1 = 1<<(irq - 8);
+        pic->disable_irqs_1 = 1<<(irq - 8);
     } else if(irq < 72) {
-        pic->Disable_IRQs_2 = 1<<(irq - 40);
+        pic->disable_irqs_2 = 1<<(irq - 40);
     }
 }
 
@@ -87,17 +87,17 @@ void irq_handler(struct context *ctx)
     intr_reg_t *pic = (intr_reg_t *)(MMIO_BASE_PA+INTR_REG);
 
     for(irq = 0 ; irq < 8; irq++)
-        if(pic->IRQ_basic_pending & (1<<irq))
+        if(pic->irq_basic_pending & (1<<irq))
             break;
 
     if(irq == 8){
         for( ; irq < 40; irq++)
-            if(pic->IRQ_pending_1 & (1<<(irq-8)))
+            if(pic->irq_pending_1 & (1<<(irq-8)))
                 break;
 
         if(irq == 40) {
             for( ; irq < 72; irq++)
-                if(pic->IRQ_pending_1 & (1<<(irq-40)))
+                if(pic->irq_pending_1 & (1<<(irq-40)))
                     break;
 
             if(irq == 72)
@@ -110,7 +110,7 @@ void irq_handler(struct context *ctx)
     switch(irq) {
     case 0: {
         armtimer_reg_t *pit = (armtimer_reg_t *)(MMIO_BASE_PA+ARMTIMER_REG);
-        pit->IRQClear = 1;
+        pit->irqclear = 1;
         break;
     }
     }
@@ -123,10 +123,10 @@ static void init_pit(uint32_t freq)
 {
     uint32_t timer_clock = 1000000;
     armtimer_reg_t *pit = (armtimer_reg_t *)(MMIO_BASE_PA+ARMTIMER_REG);
-    pit->Load = timer_clock/freq;
-    pit->Reload = pit->Load;
-    pit->PreDivider = (SYS_CLOCK_FREQ/timer_clock)-1;
-    pit->Control = ARMTIMER_CTRL_23BIT |
+    pit->load = timer_clock/freq;
+    pit->reload = pit->load;
+    pit->predivider = (SYS_CLOCK_FREQ/timer_clock)-1;
+    pit->control = ARMTIMER_CTRL_23BIT |
                 ARMTIMER_CTRL_PRESCALE_1 |
                 ARMTIMER_CTRL_INTR_ENABLE |
                 ARMTIMER_CTRL_ENABLE;
@@ -134,20 +134,21 @@ static void init_pit(uint32_t freq)
 
 void cstart(void)
 {
-	{
-		char *s="Hello, world!\r\n";
+    {
+        char *s="Hello, world!\r\n";
 
-		init_uart(9600);
+        init_uart(9600);
 
-		while(*s)
-			sys_putchar(*s++);
-	}
+        while(*s)
+            sys_putchar(*s++);
+    }
 
     {
-		int i;
+        int i;
 
-		init_pic();
-		init_pit(HZ);
+        /*初始化中断控制器和定时器*/
+        init_pic();
+        init_pit(HZ); // HZ=100
 
         /*安装默认的中断处理程序*/
         for(i = 0; i < NR_IRQ; i++)
@@ -157,7 +158,8 @@ void cstart(void)
         g_intr_vector[IRQ_TIMER] = isr_timer;
         enable_irq(IRQ_TIMER);
 
-		sti();
+        /*CPSR.I=0*/
+        sti();
     }
 
     while(1);

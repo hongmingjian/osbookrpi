@@ -17,7 +17,7 @@ BCM2835作为系统芯片（SoC），除了CPU和内存之外，还集成了GPU�
 \begin{code}
 \captionof{listing}{chapter02/kernel/machdep.c}
 \label{code:2-1}
-\inputminted[firstline=6,lastline=30,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter02/kernel/machdep.c}
+\inputminted[firstline=6,lastline=38,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter02/kernel/machdep.c}
 \end{code}
 
 
@@ -26,7 +26,7 @@ BCM2835作为系统芯片（SoC），除了CPU和内存之外，还集成了GPU�
 \begin{code}
 \captionof{listing}{chapter02/kernel/machdep.c}
 \label{code:2-2}
-\inputminted[firstline=32,lastline=41,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter02/kernel/machdep.c}
+\inputminted[firstline=40,lastline=48,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter02/kernel/machdep.c}
 \end{code}
 
 
@@ -41,7 +41,7 @@ BCM2835作为系统芯片（SoC），除了CPU和内存之外，还集成了GPU�
 \end{code}
 
 
-entry是系统的入口点，当CPU复位时，即从entry开始执行，它只是简单做了一个跳转，跳到reset处开始执行。首先，我们初始化栈，因为后续的函数调用需要用栈来保存一些函数参数和局部变量。考虑到栈是向低地址增长的，我们把栈放在0x1000的位置。栈初始化完成后，立即跳转到C语言的函数cstart开始完成后续的初始化工作。细心的读者可能注意到了，cstart为什么要在前面加入一个下划线？历史上，C语言编译器在全局变量或者函数的符号前面加入一个下划线，我们保留这个传统。所以，C语言中定义的全局函数cstart，在汇编中要用\_cstart引用它。反过来也一样，如果汇编语言定义的全局变量或者函数要被C语言调用，在名字前面也要加上一个下划线。
+\_entry是系统的入口点，当CPU复位时，即从\_entry开始执行，它只是简单做了一个跳转，跳到reset处开始执行。首先，我们初始化栈，因为后续的函数调用需要用栈来保存一些函数参数和局部变量。考虑到栈是向低地址增长的，我们把栈放在0x1000的位置。栈初始化完成后，立即跳转到C语言的函数cstart开始完成后续的初始化工作。细心的读者可能注意到了，cstart为什么要在前面加入一个下划线？历史上，C语言编译器在全局变量或者函数的符号前面加入一个下划线，我们保留这个传统。所以，C语言中定义的全局函数cstart，在汇编中要用\_cstart引用它。反过来也一样，如果汇编语言定义的全局变量或者函数要被C语言调用，在名字前面也要加上一个下划线。
 
 \par
 cstart函数比较简单，它首先初始化串口，波特率设置为9600，然后循环调用sys\_putchar把字符串“Hello, world!”打印出来。最后，我们通过一个无限空循环让控制停cstart函数中，如代码\ref{code:2-4}。
@@ -49,7 +49,7 @@ cstart函数比较简单，它首先初始化串口，波特率设置为9600，�
 \begin{code}
 \captionof{listing}{chapter02/kernel/machdep.c}
 \label{code:2-4}
-\inputminted[firstline=42,lastline=54,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter02/kernel/machdep.c}
+\inputminted[firstline=50,lastline=60,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter02/kernel/machdep.c}
 \end{code}
 
 
@@ -99,7 +99,7 @@ cstart函数比较简单，它首先初始化串口，波特率设置为9600，�
 
 \begin{figure}[htp]
 \centering
-\includegraphics[scale=0.6]{figures/2-1.png}
+\includegraphics[scale=0.4]{figures/2-1.png}
 \caption{objdump反汇编的输出}
 \label{figure:2-1}
 \end{figure}
@@ -113,8 +113,8 @@ cstart函数比较简单，它首先初始化串口，波特率设置为9600，�
 
 \begin{figure}[htp]
 \centering
-\includegraphics[scale=0.6]{figures/2-2.png}
-\caption{树莓派会说“Hello, world!”了}
+\includegraphics[scale=0.4]{figures/2-2.png}
+\caption{树莓派说“Hello, world!”}
 \label{figure:2-2}
 \end{figure}
 
@@ -147,7 +147,7 @@ dependency1:dependency3
 \label{lst:firstLst}
 \inputminted[linenos,numbersep=5pt,frame=lines,framesep=2mm]{make}{src/chapter02/kernel/Makefile}
 \end{code}
-因此，我们只要执行make就会生成kernel.img文件，因为kernel.img是第一个目标。显然，make clean会删除所有自动生成的文件。
+有了Makefile，我们修改源代码后，只要敲make就会生成或更新kernel.img(因为它是第一个目标)，大大提高了开发效率。此外，make clean会删除所有自动生成的文件。
 
 \section{小结}
 本章我们通过实现一个非常简单功能，一方面验证了整个开发环境，另一方面也初步掌握了操作系统内核的开发流程，为后续进行更复杂的开发工作奠定了基础。

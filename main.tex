@@ -1,22 +1,35 @@
 \documentclass{book}
 \usepackage{subfiles}
+\usepackage{ifxetex}
+\ifxetex
+\usepackage{ctex}
+\else
 \usepackage{CJKutf8}
+\fi
 \usepackage{graphicx}
-\usepackage{minted} %  -shell-escape
+\usepackage[newfloat]{minted} %  -shell-escape
+\usepackage{ragged2e}
+\usepackage{caption} % for \captionof
 
 \newcommand{\onlyinsubfile}[1]{#1}
 \newcommand{\notinsubfile}[1]{}
 
-\begin{document}
-\begin{CJK*}{UTF8}{song}
+\newenvironment{code}{\captionsetup{type=listing}}{}
+\SetupFloatingEnvironment{listing}{name=Code}
 
+\begin{document}
+\ifxetex\else
+\begin{CJK*}{UTF8}{song}
+\fi
 \renewcommand{\onlyinsubfile}[1]{}
 \renewcommand{\notinsubfile}[1]{#1}
 
 \subfile{chapter01}
 \subfile{chapter02}
 \subfile{chapter03}
-\subfile{chapter04}
+%\subfile{chapter04}
 
+\ifxetex\else
 \end{CJK*}
+\fi
 \end{document}

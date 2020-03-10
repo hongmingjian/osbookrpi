@@ -1,11 +1,13 @@
 #ifndef _CPU_H
 #define _CPU_H
 
+#define SYS_CLOCK_FREQ 250000000UL
+
 #define MMIO_BASE_PA 0x20000000
 
 #define AUX_REG (0x215000)
 typedef struct {
-	volatile unsigned int IRQ;
+	volatile unsigned int irq;
 	volatile unsigned int enables;
 	volatile unsigned int UNUSED1[14];
 	volatile unsigned int mu_io;
