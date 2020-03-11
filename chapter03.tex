@@ -1,11 +1,7 @@
 \documentclass[main.tex]{subfiles}
-\ifxetex\else
-\onlyinsubfile{\usepackage{CJKutf8}}
-\fi
+\ifxetex\else\onlyinsubfile{\usepackage{CJKutf8}}\fi
 \begin{document}
-\ifxetex\else
-\begin{CJK*}{UTF8}{song}
-\fi
+\ifxetex\else\begin{CJK*}{UTF8}{song}\fi
 
 \chapter{中断处理}
 %% my chapter 1 content
@@ -194,7 +190,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 
 \begin{code}
 \captionof{listing}{chapter03/kernel/machdep.c}
-\label{code:3-14}
+\label{code:3-15}
 \inputminted[firstline=83,lastline=117,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/machdep.c}
 \end{code}
 
@@ -215,7 +211,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 
 \begin{code}
 \captionof{listing}{chapter03/kernel/machdep.c}
-\label{code:3-15}
+\label{code:3-16}
 \inputminted[firstline=42,lastline=51,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/machdep.c}
 \end{code}
 
@@ -223,7 +219,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 
 \begin{code}
 \captionof{listing}{chapter03/kernel/machdep.c}
-\label{code:3-16}
+\label{code:3-17}
 \inputminted[firstline=53,lastline=81,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/machdep.c}
 \end{code}
 
@@ -235,7 +231,7 @@ BCM2835内部集成了一片定时器AP804，下面我们对它进行初始化�
 
 \begin{code}
 \captionof{listing}{chapter03/kernel/machdep.c}
-\label{code:3-17}
+\label{code:3-18}
 \inputminted[firstline=119,lastline=133,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/machdep.c}
 \end{code}
 
@@ -243,18 +239,18 @@ BCM2835内部集成了一片定时器AP804，下面我们对它进行初始化�
 
 \begin{code}
 \captionof{listing}{chapter03/kernel/kernel.c}
-\label{code:3-18}
+\label{code:3-19}
 \inputminted[firstline=3,lastline=23,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/kernel.c}
 \end{code}
 
-注意，在处理完中断后，要清除定时器的中断未决标志，表示可以接收下一次的中断。这个工作已经在irq\_handler中完成了，见代码\ref{code:3-15}中的110-115行。
+注意，在处理完中断后，要清除定时器的中断未决标志，表示本次中断处理完了，准备接收下一次中断。这个工作已经在irq\_handler中完成了，见代码\ref{code:3-15}中的110-115行。
 
 \par
 现在，我们已经完成各个模块的工作，可以在cstart函数中把它们组装起来。首先，初始化PIC和PIT，并把中断向量表填上默认的中断处理函数的地址。然后，把定时器中断处理函数的地址填入对应的中断向量表项，让PIC开启定时器中断。最后，因为CPU复位后默认不响应中断请求，即CPSR.I=1，我们用函数sti把CPSR.I=0，即让CPU响应中断请求。
 
 \begin{code}
 \captionof{listing}{chapter03/kernel/machdep.c}
-\label{code:3-19}
+\label{code:3-20}
 \inputminted[firstline=135,lastline=166,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/machdep.c}
 \end{code}
 
@@ -262,7 +258,7 @@ BCM2835内部集成了一片定时器AP804，下面我们对它进行初始化�
 
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
-\label{code:3-20}
+\label{code:3-21}
 \inputminted[firstline=153,lastline=166,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
@@ -270,13 +266,11 @@ BCM2835内部集成了一片定时器AP804，下面我们对它进行初始化�
 
 \begin{figure}[htp]
 \centering
-\includegraphics[scale=0.4]{figures/3-6.png}
+\includegraphics[scale=0.5]{figures/3-6.png}
 \caption{定时器中断的输出}
 \label{figure:3-6}
 \end{figure}
 
 \clearpage
-\ifxetex\else
-\end{CJK*}
-\fi
+\ifxetex\else\end{CJK*}\fi
 \end{document} 

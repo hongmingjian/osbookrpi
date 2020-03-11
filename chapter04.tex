@@ -1,11 +1,7 @@
 \documentclass[main.tex]{subfiles}
-\ifxetex\else
-\onlyinsubfile{\usepackage{CJKutf8}}
-\fi
+\ifxetex\else\onlyinsubfile{\usepackage{CJKutf8}}\fi
 \begin{document}
-\ifxetex\else
-\begin{CJK*}{UTF8}{song}
-\fi
+\ifxetex\else\begin{CJK*}{UTF8}{song}\fi
 
 \chapter{内存管理（上）}
 内存管理是操作系统必备的功能之一，也是操作系统实现虚拟化的重要功能。虽然epos是单进程、多线程的操作系统，但是epos支持虚拟内存。目前，虚拟内存一般都是通过分页来实现。
@@ -180,7 +176,5 @@ BCM2835的内存映射如图所示。其中内存(SDRAM)位于？？？，外围
 至此，逻辑地址空间的布局如图所示。物理内存的布局如图所示。
 
 \clearpage
-\ifxetex\else
-\end{CJK*}
-\fi
+\ifxetex\else\end{CJK*}\fi
 \end{document} 

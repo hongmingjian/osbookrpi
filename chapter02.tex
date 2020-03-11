@@ -1,11 +1,7 @@
 \documentclass[main.tex]{subfiles}
-\ifxetex\else
-\onlyinsubfile{\usepackage{CJKutf8}}
-\fi
+\ifxetex\else\onlyinsubfile{\usepackage{CJKutf8}}\fi
 \begin{document}
-\ifxetex\else
-\begin{CJK*}{UTF8}{song}
-\fi
+\ifxetex\else\begin{CJK*}{UTF8}{song}\fi
 
 \chapter{系统启动}
 \justify
@@ -99,7 +95,7 @@ cstart函数比较简单，它首先初始化串口，波特率设置为9600，�
 
 \begin{figure}[htp]
 \centering
-\includegraphics[scale=0.4]{figures/2-1.png}
+\includegraphics[scale=0.5]{figures/2-1.png}
 \caption{objdump反汇编的输出}
 \label{figure:2-1}
 \end{figure}
@@ -113,7 +109,7 @@ cstart函数比较简单，它首先初始化串口，波特率设置为9600，�
 
 \begin{figure}[htp]
 \centering
-\includegraphics[scale=0.4]{figures/2-2.png}
+\includegraphics[scale=0.5]{figures/2-2.png}
 \caption{树莓派说“Hello, world!”}
 \label{figure:2-2}
 \end{figure}
@@ -141,10 +137,10 @@ dependency1:dependency3
 有了Makefile，只要运行 “make target”，它会根据target的依赖，执行动作。如果依赖本身也是目标，它的动作也会被执行，形成递归执行，直到所有的依赖都得到满足。如果不带目标运行make，默认构建第一个目标。
 
 \par
-我们的Makefile如代码\ref{lst:firstLst}所示。
+我们的Makefile如代码\ref{code:2-6}所示。
 \begin{code}
 \captionof{listing}{kernel/Makefile}
-\label{lst:firstLst}
+\label{code:2-6}
 \inputminted[linenos,numbersep=5pt,frame=lines,framesep=2mm]{make}{src/chapter02/kernel/Makefile}
 \end{code}
 有了Makefile，我们修改源代码后，只要敲make就会生成或更新kernel.img(因为它是第一个目标)，大大提高了开发效率。此外，make clean会删除所有自动生成的文件。
@@ -160,7 +156,5 @@ dependency1:dependency3
 \fi
 
 \clearpage
-\ifxetex\else
-\end{CJK*}
-\fi
+\ifxetex\else\end{CJK*}\fi
 \end{document} 
