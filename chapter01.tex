@@ -28,11 +28,11 @@
 \begin{itemize}
 \item 树莓派：本文采用1B版做测试，也适用于1B+版和zero版，但尚未在RPI2之后的版本上测试过。该版本树莓派采用博通（Broadcom）的BCM2835作为中央处理器，架构上属于ARMv6的ARM1176JZF-S，只有一个核心。
 
-\item USB转串口小板和3根杜邦线：相比于显示器的输出，串口是最容易接收树莓派输出的接口。目前大部分计算机没有串口（也称为RS232、UART或COM口），而配置了多个USB接口，因此需要一个USB转串口的小板，如图\ref{figure:1-1}所示。连接方法是将树莓派与小板的TxD与RxD对接，GND直连即可，如图\ref{figure:1-1}所示。如果你用1B+版本及其以后的树莓派，它提供了40个引脚，其中前26个与B+之前的版本是兼容的，所以串口的连接方法仍然如图所示。
+\item USB转串口小板和2根杜邦线：相比于显示器的输出，串口是最容易接收树莓派输出的接口。目前大部分计算机没有串口（也称为RS232、UART或COM口），而配置了多个USB接口，因此需要一个USB转串口的小板，如图\ref{figure:1-1}所示。连接方法是将树莓派与小板的TxD与RxD对接，如图\ref{figure:1-1}所示。如果你用1B+版本及其以后的树莓派，它提供了40个引脚，其中前26个与B+之前的版本是兼容的，所以串口的连接方法仍然如图所示。
 
 \begin{figure}[htp]
 \centering
-\includegraphics[scale=0.4]{figures/1-1.png}
+\includegraphics[scale=0.2]{figures/1-1.png}
 \caption{树莓派串口连接示意图}
 \label{figure:1-1}
 \end{figure}
@@ -44,10 +44,10 @@
 
 \subsection{软件环境}
 \begin{itemize}
-\item 首先，把SD卡格式化成FAT文件系统，然后从\htmladdnormallink{GitHub}{https://github.com/raspberrypi/firmware/}下载bootcode.bin和start.elf两个文件并复制到SD卡的根目录下。bootcode.bin和start.elf是树莓派的引导程序，功能上类似于IBM-PC上的BIOS。
+\item 首先，把SD卡格式化成FAT32文件系统，然后从\htmladdnormallink{GitHub}{https://github.com/raspberrypi/firmware/}下载bootcode.bin和start.elf两个文件并复制到SD卡的根目录下。bootcode.bin和start.elf是树莓派的引导程序，功能上类似于IBM-PC上的BIOS。
 \item 因为在开发过程中需要用到一些Unix/Linux平台的工具软件，所以如果在 Windows 下面做开发，要安装\htmladdnormallink{MSYS2}{https://www.msys2.org}。
-\item 从ARM公司\htmladdnormallink{官网}{https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm}下载GNU工具链等开发工具，解压缩后把arm-none-eabi/bin加入到路径PATH中。
-\item 准备一个查看串口输出的工具，在Windows平台上，可以使用\htmladdnormallink{PuTTY}{https://www.putty.org}；Unix/Linux可以使用minicom。
+\item 从ARM公司\htmladdnormallink{官网}{https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm}下载GNU工具链，解压缩后把arm-none-eabi/bin加入到路径PATH中。
+\item 准备一个查看串口输出的工具，在Windows平台上，可以使用\htmladdnormallink{PuTTY}{https://www.putty.org}；Unix/Linux可以使用\htmladdnormallink{screen}{https://www.gnu.org/software/screen/}。
 \item \htmladdnormallink{QEMU}{https://www.qemu.org}可以模拟树莓派的部分功能，在后期的开发测试过程中，为了提高开发效率，可以用QEMU来代替，以避免反复的插拔SD卡。在前期开发过程中，不建议用QEMU模拟器。
 \end{itemize}
 

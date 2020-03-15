@@ -65,7 +65,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \inputminted[firstline=104,lastline=112,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
-在C语言中，要把未初始化的全局或静态变量全部置0。编译器会把这些变量统一放在一个称为BSS(Block Started by Symbol)的段中。在链接器脚本(kernel.ld.in)中，我们定义的两个符号\_edata和\_end，分别标识了BSS段的开始和结束。在调用C程序之前，要确保这部分变量的值是0。这正是代码\ref{code:3-3}的功能。
+在C语言中，要把未初始化的全局或静态变量全部置0。编译器会把这些变量统一放在一个称为BSS(Block Started by Symbol)的段中。在链接器脚本kernel.ld.in(代码\ref{code:2-5})中，我们定义的两个符号\_edata和\_end，分别标识了BSS段的开始和结束。在调用C程序之前，要确保这部分变量的值是0。这正是代码\ref{code:3-3}的功能。
 
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
@@ -202,7 +202,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 
 \begin{figure}[htp]
 \centering
-\includegraphics[scale=1]{figures/3-5.png}
+\includegraphics[scale=0.6]{figures/3-5}
 \caption{中断控制器}
 \label{figure:3-5}
 \end{figure}

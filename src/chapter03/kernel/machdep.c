@@ -60,7 +60,7 @@ void enable_irq(uint32_t irq)
         pic->enable_basic_irqs = 1 << irq;
     } else if(irq < 40) {
         pic->enable_irqs_1 = 1<<(irq - 8);
-    } else if(irq < 72) {
+    } else if(irq < NR_IRQ) {/*=72*/
         pic->enable_irqs_2 = 1<<(irq - 40);
     }
 }
@@ -75,7 +75,7 @@ void disable_irq(uint32_t irq)
         pic->disable_basic_irqs = 1 << irq;
     } else if(irq < 40) {
         pic->disable_irqs_1 = 1<<(irq - 8);
-    } else if(irq < 72) {
+    } else if(irq < NR_IRQ) {/*=72*/
         pic->disable_irqs_2 = 1<<(irq - 40);
     }
 }
@@ -96,11 +96,11 @@ void irq_handler(struct context *ctx)
                 break;
 
         if(irq == 40) {
-            for( ; irq < 72; irq++)
+            for( ; irq < NR_IRQ; irq++)
                 if(pic->irq_pending_1 & (1<<(irq-40)))
                     break;
 
-            if(irq == 72)
+            if(irq == NR_IRQ)/*=72*/
                 return;
         }
     }
