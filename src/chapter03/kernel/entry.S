@@ -1,3 +1,5 @@
+#define LOADADDR 0x8000
+
 #define PSR_MODE_USR  0x10
 #define PSR_MODE_FIQ  0x11
 #define PSR_MODE_IRQ  0x12
@@ -67,21 +69,21 @@
    ldmia sp, {r13, r14}^;               \
    add   sp, sp, #(3*4);                \
    ldmia sp!, {lr, pc}^
-    
-    .extern _cstart                @声明cstart是外部符号
-    .extern _edata, _end           @这两个符号在链接器脚本kernel.ld.in中定义
-    .extern _irq_handler           @C语言的中断处理函数
-    
-    .text                          @代码段开始
-    .globl _entry                  @声明_entry是全局符号
+
+    .extern _cstart               @声明cstart是外部符号
+    .extern _edata, _end          @这两个符号在链接器脚本kernel.ld.in中定义
+    .extern _irq_handler          @C语言的中断处理函数
+
+    .text                         @代码段开始
+    .globl _entry                 @声明_entry是全局符号
 _entry:
-    ldr pc, vector_reset           @把PC设置为vector_reset处的值
-    ldr pc, vector_undefined       @把PC设置为vector_undefined处的值
-    ldr pc, vector_swi             @把PC设置为vector_swi处的值
-    ldr pc, vector_prefetch_abort  @把PC设置为vector_prefetch_abort处的值
-    ldr pc, vector_data_abort      @把PC设置为vector_data_abort处的值
+    ldr pc, vector_reset          @把PC设置为vector_reset处的值
+    ldr pc, vector_undefined      @把PC设置为vector_undefined处的值
+    ldr pc, vector_swi            @把PC设置为vector_swi处的值
+    ldr pc, vector_prefetch_abort @把PC设置为vector_prefetch_abort处的值
+    ldr pc, vector_data_abort     @把PC设置为vector_data_abort处的值
     b   .
-    ldr pc, vector_irq             @把PC设置为vector_irq处的值
+    ldr pc, vector_irq            @把PC设置为vector_irq处的值
     b   .
 
 vector_reset:
@@ -102,7 +104,7 @@ vector_fiq:
     .word 0
 
 reset:
-    mov r0, #0x8000
+    mov r0, #LOADADDR @=0x8000
     mov r1, #0x0000
     ldmia r0!, {r2-r9}
     stmia r1!, {r2-r9}
@@ -144,23 +146,23 @@ zeroify.1:
 
 irq:
     PUSHCONTEXT
-	
+
     mov     r0, sp
     bl      _irq_handler
 
     PULLCONTEXT
-    
+
     .globl  _sti, _cli
-_sti:                           @ enable interrupt
+_sti:                           @enable interrupt
     stmfd   sp!, {r0, lr}
     mrs     r0, cpsr
     bic     r0, r0, #PSR_I
     msr     cpsr_cxsf, r0
     ldmfd   sp!, {r0, pc}
 
-_cli:                           @ disable interrupt
+_cli:                           @disable interrupt
     stmfd   sp!, {r0, lr}
     mrs     r0, cpsr
     orr     r0, r0, #PSR_I
     msr     cpsr_cxsf, r0
-    ldmfd   sp!, {r0, pc}   
+    ldmfd   sp!, {r0, pc}

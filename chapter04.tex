@@ -4,176 +4,444 @@
 \ifxetex\else\begin{CJK*}{UTF8}{song}\fi
 
 \chapter{内存管理（上）}
-内存管理是操作系统必备的功能之一，也是操作系统实现虚拟化的重要功能。虽然epos是单进程、多线程的操作系统，但是epos支持虚拟内存。目前，虚拟内存一般都是通过分页来实现。
-为了跟主流的32位操作系统保持一致，我们让epos内核运行在3GiB之上的逻辑地址空间中，即内核运行在3GiB以上，用户程序运行在3GiB以下的逻辑地址空间中。
-BCM2835的内存映射如图所示。其中内存(SDRAM)位于？？？，外围设备控制器的内存映射地址位于?？？。
+内存管理是操作系统的基本功能之一。在主流的操作系统中，一般都通过分页实现虚拟内存，给每个进程分配了一个巨大、连续、私有的虚拟内存，极大地简化了进程的内存管理。不仅如此，分页还允许进程之间共享内存，提高了物理内存的利用率。在32位操作系统中，4GiB的地址空间一般采用3:1布局，即0-3GiB给用户代码，3-4GiB留给内核。
+
+\par
+本章讲解如何在ARM上面实现基于分页的虚拟内存。
+
+\section{物理内存布局}
+在树莓派的物理内存布局中，SDRAM位于0-0x20000000(512MiB)，外围设备控制器的内存映射I/O(Memory-mapped I/O, MMIO)位于0x20000000-0x21000000。截止到目前为止，物理内存的使用情况如图\ref{figure:4-1}所示。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.3]{figures/4-1}
+\caption{物理内存使用情况}
+\label{figure:4-1}
+\end{figure}
+
+\noindent
+其中，异常向量表所占的0-0x40共64个字节是从kernel.img的起始64字节拷贝而来。符号\_end定义在链接器脚本(代码\ref{code:2-5})中，它地址等于kernel.img的结束地址。因为内核的链接地址从0xc0008000开始，所以\_end的地址等于0xc0008000加上kernel.img的大小。宏定义R(x)等于(x-0xc0000000)。
+
+\section{页表结构}
+ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级页表结构。一级页表分为Section或Page，二级页表分为Large或Small Page。如图\ref{figure:4-2}和\ref{figure:4-3}所示。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.3]{figures/4-2}
+\caption{ARMv6的一级页表项}
+\label{figure:4-2}
+\end{figure}
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.3]{figures/4-3}
+\caption{ARMv6的二级页表项}
+\label{figure:4-3}
+\end{figure}
+
+我们将采用4KiB页面，对应于Small Page结构，因此一级页表的大小是16KiB，共4096项；二级页表的大小是1KiB，共256项。从地址划分来看，这种结构意味着32位的逻辑地址被分成了3段，第一段12位，用于索引一级页表；第二段8位，用于索引二级页表；第三段12位，是页面内部的偏移量。图\ref{figure:4-4}给出了这种方案的地址转换过程。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.3]{figures/4-4}
+\caption{地址转换过程(4KiB)}
+\label{figure:4-4}
+\end{figure}
+
+\section{修改链接地址}
+与大部分32位的操作系统相同，我们也让内核运行在3GiB(0xc0000000)以上的位置。也就是说，kernel.img被加载到物理地址0x8000的位置，但我们要让它在0xc0008000的逻辑地址上运行。
+
+\par
+在初始化页表之前，先要把内核kernel.img链接到0xc0008000。因为程序的逻辑地址是由链接器确定的。因此，要告诉链接器将内核链接到0xc0008000，而不是原来的0x8000。这只要修改链接器脚本kernel.ld.in即可。在代码\ref{code:2-5}的基础上，只是添加了第2行、修改了第9行，如代码\ref{code:4-1}所示。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/kernel.ld.in}
+\label{code:4-1}
+\inputminted[firstline=1,lastline=12,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/kernel.ld.in}
+\end{code}
+
+修改链接地址后，相应地要修改vector\_reset处的值。根据新的链接地址，\_entry的地址是0xc0008000，而reset的地址是0xc0008040。CPU复位时，这个地址显然是无效的，而真正有效的地址是R(reset)，即0x8040。这正是代码\ref{code:4-2}中92行。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/entry.S}
+\label{code:4-2}
+\inputminted[firstline=79,lastline=108,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter04/kernel/entry.S}
+\end{code}
+
+重新编译之后，用命令“arm-none-eabi-objdump -D kernel.elf”查看反汇编的代码，可以发现所有的地址都被加上了0xc0000000，如图\ref{figure:4-5}所示。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.5]{figures/4-5}
+\caption{内核链接到0xc0008000}
+\label{figure:4-5}
+\end{figure}
+
+严格来说，kernel.img只有被加载地址0xc0008000才能运行。然而，它被加载到0x8000的位置，也可以运行。其原因在于编译器在产生代码的时候，会用相对地址。例如，图\ref{figure:4-5}中\_entry处的几条指令，都是“ldr pc, [pc, \#24]”，这个指令的意思是：把(PC+24)处4个字节的数据赋值给PC。因为树莓派的CPU在复位时PC=0x8000，这条指令会把0x8020处(为什么不是0x8018？因为在ARM中PC等于下一条指令的地址加8)的4字节数据赋值给PC，即PC=0x8040。因此，这样的kernel.img即使被加载到0x8000也是可以运行的，因为通过相对地址避免了引用0xc0008020这样的绝对地址。
+
+\par
+但是，不是所有的操作都可以用相对地址，例如访问全局变量一般会用到绝对地址。因为链接地址从0xc0008000开始，这些位置显然没有任何内存，如果运行过程中引用了全局变量，就会导致程序出错。下面，我们通过初始化页表，让内核运行在被链接的逻辑地址之上。也就是说，我们要把内核从加载地址0x8000重定位到逻辑地址0xc0008000。注意，在初始化过程中，不能引用全局变量。
 
 \section{页表初始化}
-对于分页系统，页表是最核心的数据结构。ARMv6支持多种页表组织方式，一级页表分为Section和Page，二级页表分为Large和Small Page。在epos中，一级页表采用Page，二级页表采用Small Page。一级页表的大小是16KiB，共4096项；二级页表的大小是1KiB，共256项；页面大小是4KiB。从地址划分来看，意味着32位的逻辑地址被分成了三段，第一段12位，用于索引一级页表；第二段8位，用于索引二级页表；第三段12位，是页面内部的偏移量。图分别给出了一级和二级页表项的结构。
+函数init\_paging用于初始化页表，参数physfree是空闲物理内存的起始地址。在我们的系统中，一级页表(也称为页目录)大小为16KiB，保存着4096张二级页表的物理地址。根据当前的内存使用状况(图\ref{figure:4-1})，把一级页表放物理内存0x4000处。
 
-因为epos是单进程，因此只需要一组页表(包括一个一级页表和多个二级页表)就够了。下面我们就来初始化这组系统唯一的页表。
-为了构建页表结构，我们来看一下此时物理内存的使用状况，如图所示。
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-3}
+\inputminted[firstline=137,lastline=149,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
 
+\noindent
+146-147行把一级页表的物理地址保存在变量pgdir中，然后把内容全部清零。
 
-其中，异常向量表所占的0-0x40共64个字节是从kernel.img的起始64字节拷贝而来。
-前面提到，我们要安排epos内核运行在3GiB的位置。也就是说，尽管kernel.img被加载到0x8000的物理内存位置，但要让它在0xc0008000的逻辑地址运行。页表初始化的任务就是把内核自己从加载地址0x8000重定位到逻辑地址0xc0008000上去。
-首先，程序的逻辑地址由链接器确定。因此，要告诉链接器，要将内核链接到0xc0008000的位置上，而不是原来的0x8000。这只要修改链接器脚本ldscript.in即可。与图？？相比，只是添加了02行，修改了08行。
-\inputminted[linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/kernel.ld.in}
+\par
+为了在逻辑地址空间中能够访问二级页表，要把它们映射到逻辑地址空间中。因为二级页表需要4MiB的逻辑地址（4096张$\times$1KiB/张），我们决定把它们放在逻辑地址[0xbfc00000, 0xc0000000]，而且它们自身也要消耗4张二级页表。代码\ref{code:4-4}分配了4张二级页表用来映射所有的二级页表。我们可以称这4张页表为二级页表的二级页表，这也是变量ptpte的意义所在。因为二级页表全部位于逻辑地址[0xbfc00000, 0xc0000000]，因此这4张特殊的二级页表应该分别被填到一级页表的0xbfc(3068), 0xbfd(3069), 0xbfe(3070), 0xbff(3071)四项。需要特别解释一下第162行，它保证了我们将来可以在逻辑地址空间中访问这4张特殊的二级页表。
 
-重新编译之后，用objdump查看反汇编的代码，可以发现所有的地址都被加上了0xc0000000。
+\par
+为了方便理解，这里列出各宏定义的值：PAGE\_SIZE=4KiB, L2\_TABLE\_SIZE=1KiB, PGDR\_SHIFT=20, (USER\_MAX\_ADDR\textgreater\textgreater PGDR\_SHIFT)=0xbfc(3068), L2\_ENTRY\_COUNT=1024。
 
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-4}
+\inputminted[firstline=151,lastline=162,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
 
-从理论上来说，kernel.img只有被加载地址0xc0008000才能运行。然而事实上，它将被加载到0x8000的位置，而且也可以运行。其原因在于编译器在产生代码的时候，会尽量用相对地址，例如，\_entry处的几条指令，都是“ldr pc, [pc, \#24]”，这个指令的意思是：把当前PC前面24字节处的4个字节数据作为PC，亦即跳转到当前指令24个字节，即6条指令。其中第二个操作数“[pc, \#24]”的意思就是相对于当前的PC，前面24个字节处的数据。因此，这样的kernel.img即使被加载到0x8000也是可以运行的。
-但是，不是所有的操作都可以用相对地址，有时不可避免会产生绝对地址，例如访问全局变量用的是绝对地址。如果程序运行过程中引用了全局变量，就会导致程序出错。因此，需要通过初始化页表，让内核真正运行在被链接的逻辑地址（即0xc0008000）。
-函数init\_paging用于初始化页表，参数physfree是空闲物理内存的地址。据前面所述，一级页表大小为16KiB，包含了4096张二级页表的物理地址。根据当前的物理内存使用状况，把一级页表保存在物理内存0x4000处。
-\inputminted[firstline=135,lastline=147,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+接下来，为内核地址空间（3GiB～4GiB）分配二级页表。尽管理论上需要1024张二级页表，但是，实际上用不了那么多，因此目前只给它分配80（即NR\_KERN\_PAGETABLE）张。一张二级页表可以映射1MiB的地址空间，这意味着可以映射80MiB的逻辑地址空间，暂时已经足够用了。当然，我们要把二级页表的物理地址填充到一级页表中，而且所有的二级页表都要清零。此外，还要把新分配的二级页表以页面为单位(4张二级页表组成1个页面)，填充到ptpte中，保证将来用逻辑地址可以访问二级页表。注意，我们在填充一级页表的时候，把一级页表的第i项和(i+0xc00)项填充成相同的值(170行)，这意味着逻辑地址x和（0xc0000000+x）将被映射到相同的物理地址。二级页表项的标志位L2E\_V表示采用图\ref{figure:4-3}中的Small page格式，L2E\_W表示可以写，L2E\_C表示可以被缓存。
 
-？？行把一级页表的地址保存在变量pgdir中，然后把一级页表全部清零。
-为了在逻辑地址空间中能够访问二级页表，要把它们也映射到逻辑地址空间中来。二级页表需要4MiB的逻辑地址（一张二级页表占1KiB，共4096张）。我们把二级页表放在0xbfc00000。
-首先，我们来放置二级页表。由于二级页表本身占用4MiB地址空间，因此要消耗4张二级页表。根据它们所在的逻辑地址，这4张二级页表应该填入页目录的0xbfc, 0xbfd, 0xbfe, 0xbff四项。在填充一级页表项时，标志位L1E\_V表示页表项的格式是Coarse page table，Domain设置为1。后面可以看到Domain=1表示Client，即所有内存访问都必须进行权限检查。注意，其中的“(((uint32\_t)PT)>>PGDR\_SHIFT)”等于0xbfc。
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-5}
+\inputminted[firstline=164,lastline=176,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
 
-\inputminted[firstline=149,lastline=159,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+这样，我们就准备好了一、二级页表，如图\ref{figure:4-6}所示。
 
-需要特别解释一下最后一行，即？？行，它保证了我们可以用地址0xbfeff000来访问ptpte。
-接下来，我们为内核的地址空间分配二级页表。尽管内核的地址空间（3GiB-4GiB）需要1024张二级页表，目前我们只给它分配80（即NR\_KERN\_PAGETABLE）张二级页表。一张二级页表可以映射1MiB的地址空间，这意味着可以映射80MiB的逻辑地址空间。当然，我们要把二级页表的物理地址填充到一级页表中，而且所有的二级页表都要清零。此外，还要把新分配的二级页表以页面为单位，填充到ptpte中。注意，我们在填充一级页表的时候，把一级页表的第i项和（i+0xc00）项填充成相同的值，这意味着逻辑地址n和（0xc0000000+n）将被映射到相同的物理地址。二级页表项的标志位L2E\_V表示small page，L2E\_W表示可以读写，L2E\_C表示可以被缓存。
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.3]{figures/4-6}
+\caption{一、二级页表组织}
+\label{figure:4-6}
+\end{figure}
 
-\inputminted[firstline=161,lastline=173,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\par
+下面我们来填充二级页表。这部分比较简单，只要把物理内存从0开始、到R(\_end)为止，以页面为单位，把物理地址按顺序填入对应的二级页表即可，如代码\ref{code:4-6}所示。
 
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-6}
+\inputminted[firstline=179,lastline=185,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
 
-至此，我们准备好了一级和二级页表，下面我们来填充二级页表。如图所示。
+根据前面一级页表的填充方式，意味着0～R(\_end)和0xc0000000～\_end这两段逻辑地址都映射到了物理地址0～R(\_end)。其中，前者是恒等映射，它保证了分页开启后的一段时间内，可以继续访问逻辑地址0～R(\_end)。当内核完全运行在0xc0008000之后，就不需要恒等映射，届时将取消恒等映射。
 
-一张二级页表有256项，我们需要映射的地址0xc0000000-的逻辑地址映射到0-。
+\par
+好了，现在已经填充了一、二级页表，接下来开启分页功能。首先，把一级页表的物理地址pgdir填入TTBR0寄存器，然后通过TTBCR告诉MMU；(1\textless\textless2)表示我们只用Domain 1，而且把它的访问控制设置为“Client”(=1)，即所有内存访问都要进行权限检查； 在(1$\mid$(1\textless\textless23))中，1表示启动分页，(1\textless\textless23)的字面意思是禁止子页面访问权限检查，但因为只有ARMv4和ARMv5的页表结构支持子页面权限检查，所以(1\textless\textless23)表示只采用ARMv6格式的页表结构。
 
-\inputminted[firstline=175,lastline=180,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-7}
+\inputminted[firstline=187,lastline=209,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
 
-根据前面的恒等映射，意味着逻辑地址0-也映射到了0-的物理地址。恒等映射很重要，它保证了分页开启后，可以继续在原来的地址上面运行。当内核完全运行在3GiB之后，就不需要恒等映射，那时将取消恒等映射。
+\noindent
+一旦启动分页，所有的逻辑地址将被MMU通过页表转换成物理地址。这也意味着，init\_paging返回后，内核可以在链接地址上运行，而且终于可以访问全局变量了。
 
+\par
+此时，物理、逻辑地址空间布局及其映射关系如图\ref{figure:4-7}所示。
 
-至此，页目录和页表都已经准备完毕。可以开启分页功能。一旦开启分页，所有的逻辑地址将被MMU通过页目录和页表转换成物理地址。TTBR0和TTBR1设置一级页表的物理地址，TTBCR告诉MMU只用TTBR0的一级页表地址。Client设置为0x55555555表示domain全部为01，即所有内存访问都要进行权限检查。最后的 (1|(1<<23))，1表示开启MMU，(1<<23)的字面意思是禁止子页面访问权限检查，但因为只有ARMv4和ARMv5的页表结构支持子页面权限检查，所以设为1表示我们只采用ARMv6格式的页表结构。
-
-\inputminted[firstline=182,lastline=205,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
-
-最后，init\_paging的返回值是空闲物理内存的起始地址。
-
-后面我们需要两个函数：page\_map和page\_unmap，函数page\_map负责把指定的逻辑地址映射到指定的物理地址，而page\_unmap取消这种映射。
-
-\inputminted[firstline=239,lastline=263,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/page.c}
-
-其中，参数flags是页表项的标志位；其中宏定义vtopte(va)返回va所对应的的页表项的指针；函数invlpg(va)的作用是清空TLB缓存中逻辑地址va的缓存项。
-
-\inputminted[firstline=59,lastline=60,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/kernel.h}
-
-好了，现在的逻辑地址空间布局如图所示。
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.3]{figures/4-7}
+\caption{物理、逻辑地址空间布局及其映射关系}
+\label{figure:4-7}
+\end{figure}
 
 \section{物理内存管理}
-首先，我们需要记录硬件系统中物理内存的配置状况。由于不同的机器可以将内存配置在不同的地址，如有些机器的内存配置在[A, B]和[C,D]（其中B≠C）两个区域，有的机器的物理内存配置在[X,Y]一个区域。为此，我们定义一个一维数组g\_ram\_zone，用于记录系统可以使用的物理内存区域。数组g\_ram\_zone[2n]记录了一个内存区域的起始地址，g\_ram\_zone[2n+1]记录了它的结束地址。如果g\_ram\_zone[2n]和g\_ram\_zone[2n+1]都是零，表示后面没有内存区域了。我们给数组g\_ram\_zone预留了16个元素，意味着最多可以保存7个物理内存区域。由于树莓派所有的物理内存都在[0，512MiB]范围内。因此，内存区域的初始化也比较简单。
+启用分页后，从数值上来说，物理地址与逻辑地址之间已经没有什么关系了。为了记录物理内存和逻辑内存的使用状况，要分别对它们进行有效的管理。我们先从一个简单的物理内存管理器开始。
 
-\inputminted[firstline=207,lastline=216,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\par
+考虑到物理内存在物理地址空间中不一定是连续的，我们定义一个全局的一维数组g\_ram\_zone，用于记录系统可用的物理内存块。数组g\_ram\_zone[2a]记录了一个内存块的起始地址，g\_ram\_zone[2a+1]记录了它的结束地址。如果g\_ram\_zone[2b]和g\_ram\_zone[2b+1]都是零，表示后面没有内存块了。我们给数组g\_ram\_zone预留了16(=RAM\_ZONE\_LEN)个元素，意味着最多可以保存7个物理内存块。由于树莓派只有一个物理内存块[0，512MiB]，只用了g\_ram\_zone的4个元素，如代码\ref{code:4-8}所示。
 
-其中的参数physfree是已经使用的内存地址，[0, physfree]部分的内存已经被使用，不能再用于分配。
-前面的物理内存区域初始化，比较粗糙，只记录了系统可以使用的物理内存区域。接下来，我们要按照页面单位记录每一个页面的使用状况。因此，我们采用位图（bitmap）数据结构，即一个页面的状态用一位来表示，0表示空闲，1表示已分配。显然，bitmap本身也需要占用物理内存，并且能够在逻辑地址中被访问。因此，我们根据空闲内存的大小，为它分配bitmap，然后映射到逻辑地址空间中来。
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-8}
+\inputminted[firstline=211,lastline=220,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
 
-\inputminted[firstline=23,lastline=58,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/frame.c}
+\noindent
+参数physfree是可用物理内存的起始地址，即[0, physfree]部分的内存已经被使用，不能再用于分配。
 
-结构体pmzone记录每一段空闲的物理内存的起始地址、长度和bitmap的指针。Init\_frame的参数brk用于告诉init\_frame逻辑地址空间的空闲位置，该函数新的空闲逻辑地址。为了方便记忆，给出此时物理内存和逻辑地址空间的布局。
+\par
+这个简单的数组只记录了系统可用的物理内存块，显然是不够的。在分页系统中，物理内存的最小分配单位是页面，所以要记录每一个页面的使用状况。因此，我们采用位图（bitmap）进行记录，即一个页面的状态用一位来表示，0表示空闲，1表示已分配。位图本身也需要占用物理内存，而且要在逻辑内存中能被访问。因此，我们根据物理内存区域的大小，为它创建位图，然后把位图映射到逻辑地址空间中来。
 
-下面来实现物理内存的分配功能。
+\par
+对于每一个可用的物理内存区域，结构体pmzone记录了它的起始地址、长度和位图指针。函数init\_frame用于初始化物理内存管理器，它的参数virtfree是空闲逻辑内存的起始地址，用于映射位图。该函数调用了page\_map，它定义于代码\ref{code:4-15}。
 
-\inputminted[firstline=86,lastline=109,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/frame.c}
+\begin{code}
+\captionof{listing}{chapter04/kernel/frame.c}
+\label{code:4-9}
+\inputminted[firstline=23,lastline=54,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/frame.c}
+\end{code}
 
-有时候我们需要在指定的物理地址的物理内存，所以实现了frame\_alloc\_in\_addr。如果指定的物理内存已经被分配，该函数将失败。
+下面来实现物理内存的分配函数frame\_alloc。
 
-\inputminted[firstline=60,lastline=84,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/frame.c}
+\begin{code}
+\captionof{listing}{chapter04/kernel/frame.c}
+\label{code:4-10}
+\inputminted[firstline=82,lastline=105,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/frame.c}
+\end{code}
 
-下面实现物理内存的回收。
+\par
+物理内存的回收函数frame\_free，功能正好相反，这里不再列出。
 
-\inputminted[firstline=111,lastline=137,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/frame.c}
+\section{逻辑内存管理}
+与物理内存管理类似，我们用结构体vmzone记录逻辑内存块的起始地址、长度和读写保护位。与物理内存相比，逻辑内存块的数量变化比较大，因此通过单向链表进行组织。
 
-这样就实现了一个简单的物理内存管理功能。
-
-\section{逻辑地址空间管理}
-不仅物理内存需要管理，逻辑地址空间也需要管理。结构体vmzone记录了逻辑地址空间的起始地址、长度、内存保护标志位。逻辑地址空间结构体通过单项链表进行组织，如图所示。
-
+\begin{code}
+\captionof{listing}{chapter04/kernel/page.c}
+\label{code:4-11}
 \inputminted[firstline=24,lastline=36,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/page.c}
+\end{code}
 
-全局变量km0用于记录内核自身所占用的逻辑地址空间，kvmzone和uvmzone分别是内核和用户逻辑地址空间链表结构的头节点。
-函数init\_vmspace初始化逻辑地址空间结构，参数brk告诉它内核自身的逻辑地址空间结束位置。首先，它初始化了km0，从0xbfc00000到brk，VM\_PROT\_ALL表示这个逻辑地址空间是可读写的。然后，它初始化kvmzone，显然目前只有一个内核逻辑地址空间，即km0，而用户的地址空间是空的，所以把uvmzone初始化为NULL。
+逻辑地址空间由两部分组成，分别是用户、内核逻辑地址空间。用户逻辑地址空间是每个进程私有的，而内核地址空间是全局共享的。与此相对应，我们用uvmzone和kvmzone两个链表分别记录。注意，所有不在这两个链表记录范围内的逻辑内存，都是不可访问的。
 
+\par
+函数init\_vmspace初始化两个链表，参数virtfree是此时内核所用逻辑内存块的结束地址。因为此时内核已经用了一块逻辑内存[0xbfc00000, virtfree](即从二级页表开始到virtfree结束)，我们把这块内存的信息保存到静态变量km0，并作为kvmzone链表的第一个节点。而用户的逻辑地址空间是空的，所以把uvmzone初始化为NULL。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/page.c}
+\label{code:4-12}
 \inputminted[firstline=38,lastline=47,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/page.c}
+\end{code}
 
-现在我们来实现逻辑地址空间分配的函数，即page\_alloc。参数npages表示分配的页面个数，prot表示该逻辑地址空间的访问标志，user告诉page\_alloc从用户空间还是从内核空间分配。注意，这个函数调用了kmalloc，它用于管理内核堆，请参考4.6.3节。
+现在我们来实现逻辑内存块的分配函数，即page\_alloc。它的参数npages表示需要的页面个数，prot表示读写保护位，user指示从用户空间、还是从内核空间分配。注意，这个函数调用了kmalloc，它从内核堆中分配内存。内核堆的管理，将在本章稍后讲解。为什么代码\ref{code:4-12}中的km0不能用kmalloc分配呢？因为彼时还没有初始化内核堆。
 
+\begin{code}
+\captionof{listing}{chapter04/kernel/page.c}
+\label{code:4-13}
 \inputminted[firstline=112,lastline=174,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/page.c}
+\end{code}
 
-跟物理内存分配相同，经常需要在指定的地址分配逻辑地址空间。因此，
+\noindent
+函数page\_alloc的返回值是新分配的内存块在逻辑地址空间中的起始地址。此外，我们经常需要在指定的地址分配逻辑内存块，这正是函数page\_alloc\_in\_addr的功能。
 
+\begin{code}
+\captionof{listing}{chapter04/kernel/page.c}
+\label{code:4-14}
 \inputminted[firstline=49,lastline=110,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/page.c}
+\end{code}
 
-与分配相对应的是回收，
+我们还定义了两个函数：page\_map和page\_unmap。函数page\_map把指定的逻辑地址映射到指定的物理地址，而page\_unmap取消这种映射。
 
-\inputminted[firstline=176,lastline=212,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/page.c}
+\begin{code}
+\captionof{listing}{chapter04/kernel/page.c}
+\label{code:4-15}
+\inputminted[firstline=239,lastline=252,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/page.c}
+\end{code}
 
-最后，需要一个函数判断某个逻辑地址是否在某个逻辑地址空间中。如果在，则返回其保护位；否则返回失败。
+\noindent
+因为修改了页表项中的地址映射，我们用函数invlpg(va)清空TLB缓存中逻辑地址va的缓存项。
 
-\inputminted[firstline=214,lastline=237,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/page.c}
+\par
+这里着重说明一下vtopte(va)。它其实是个宏定义，计算给定逻辑地址va所对应的二级页表项的指针。把代码\ref{code:4-16}和\ref{code:4-17}放在一起看，才能更好地理解vtopte。其中，PGDR\_SHIFT=20， PAGE\_SHIFT=12，全局变量PTD指向了一级页表的起始地址，即0xc0004000；而PT指向了二级页表的起始地址，即0xbfc00000，如图\ref{figure:4-7}所示。
 
-\section{缺页异常处理}
-前面的内核堆管理中，我们只是为堆分配了逻辑地址空间，没有映射到物理内存。因此，在访问内核堆的时候，会触发data abort异常。如果执行堆中的代码，则会触发prefetch abort。这两个abort都是缺页异常（page fault），data abort是访问数据引起的，而prefetch abort从内存中预取指令时引起的。
-缺页异常时实现虚拟内存的关键之一，但是本章不实现虚拟内存的功能，如页面置换、页面交换等，只实现了。
-首先，我们去entry.S中修改异常向量表，分别实现prefetch和data abort的异常功能，如图所示。注意，这里我们仍然使用PUSHCONTEXTINSVC和PULLCONTEXTANDEXIT两个宏定义，因为这部分的处理方法与IRQ模式是完全相同的。接着，把发生异常时的CPU现场通过struct context作为第一个参数传递给C语言处理函数abort\_handler。此外，发生abort时两个重要的参数是触发该异常的逻辑地址（Fault Address，FA）和状态码（Fault Status，FS）。因此，接下来两条汇编指令从协处理器读取FA和FS并分别作为第二、三个参数，传递给abort\_handler。
-需要特别注意的是，data abort中lr指向的(pc+8)，而prefetch abort中的lr是指向（pc+4），因此在PUSHCONTEXTINSVC中处理之前，先要把lr减掉4才能进行后续的统一处理。
+\begin{code}
+\captionof{listing}{chapter04/kernel/kernel.h}
+\label{code:4-16}
+\inputminted[firstline=40,lastline=50,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/kernel.h}
+\end{code}
 
-\inputminted[firstline=155,lastline=176,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter04/kernel/entry.S}
+\begin{code}
+\captionof{listing}{chapter04/kernel/kernel.c}
+\label{code:4-17}
+\inputminted[firstline=25,lastline=26,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/kernel.c}
+\end{code}
 
-现在我们来看看abort\_handler。它只是调用do\_page\_fault处理这个缺页异常，如果do\_page\_fault返回0表示成功处理了该异常，可以继续运行；否则调用panic打印出现场信息，供用户调试使用。
+\section{缺页异常处理}\label{section:page-fault}
+启动分页后，逻辑地址与物理地址是两个独立的地址空间，它们之间通过页表进行映射。程序中引用的地址都是逻辑地址。如果访问的逻辑地址已经被映射到了物理内存，程序能正常执行。否则，CPU会触发一个缺页异常。缺页异常对于实现虚拟内存是必须的，但是本章只实现了逻辑内存到物理内存的映射，而不实现涉及输入输出的页面置换、交换等功能。
 
-\inputminted[firstline=356,lastline=362,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\par
+在ARM中，有两个缺页异常，分别是prefetch和data abort。其中，prefetch abort是从内存中预取指令时引起的，而data abort是访问内存数据引起的。
 
-所有缺页异常的逻辑都是在do\_page\_fault中处理的。它首先根据code即FS判断触发abort的原因，原因大体上可以分成三类：对齐（alignment），转换（translation），权限（permission）。目前，我们只处理了translation fault，即逻辑地址没有映射到物理内存，导致MMU不能完成地址转换，其他情况则打印出提示信息后返回失败。接着，用page\_prot判断触发异常的地址是否是合法的，即是否在逻辑地址空间中，如果不是，表示程序访问了不该访问的地址。最后，调用frame\_alloc分配一个页面的物理内存，然后修改页表，把触发异常的逻辑地址映射到新分配的物理内存上。注意，对于二级页表本身引起的缺页异常，需要把新分配的二级页表物理地址填充到一级页表中。如果没有空闲的物理内存，打印提示信息后返回失败。
+\par
+首先，要修改entry.S中的异常向量表，加上prefetch和data abort入口，如代码\ref{code:4-18}所示。
 
-\inputminted[firstline=245,lastline=354,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\begin{code}
+\captionof{listing}{chapter04/kernel/entry.S}
+\label{code:4-18}
+\inputminted[firstline=91,lastline=106,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter04/kernel/entry.S}
+\end{code}
 
-至此，我们把内存管理部分的工作完成了。
+在处理这两个异常时，仍然使用PUSHCONTEXT和PULLCONTEXT两个宏定义，因为这部分的处理方法与中断是完全相同的。需要特别注意的是，IRQ和prefetch abort时lr\_irq和lr\_abt等于(PC+4)，而data abort时lr\_abt等于(PC+8)，因此在PUSHCONTEXT之前，先要把lr减掉4才能进行后续的统一处理。
+
+\par
+接着，把缺页异常发生时的CPU现场(struct context)、以及触发该异常的逻辑地址（Fault Address，FA）和状态码（Fault Status，FS）作为参数传递给统一的C语言处理函数abort\_handler。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/entry.S}
+\label{code:4-19}
+\inputminted[firstline=157,lastline=178,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter04/kernel/entry.S}
+\end{code}
+
+现在我们来看看abort\_handler。它只是调用do\_page\_fault处理缺页异常，如果do\_page\_fault返回0表示成功处理了该异常，可以继续运行；否则调用函数panic打印信息，供调试使用。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-20}
+\inputminted[firstline=321,lastline=327,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
+
+因此，所有缺页异常的逻辑都是在do\_page\_fault中实现的。它首先根据状态码判断触发异常的原因。原因大体上可以分成三类：对齐(alignment)，转换(translation)，权限(permission)。目前，我们只处理了translation fault，即逻辑内存未映射到物理内存导致MMU不能完成地址转换，其他未处理的情况都返回失败。然后，用page\_prot判定触发异常的逻辑地址是否位于有效的逻辑内存块内，即该地址是否位于vmzone链表所记录的逻辑内存范围内。如果不是，表示访问了非法的逻辑内存，返回失败；否则，调用frame\_alloc分配一个物理内存页面。如果没有空闲的物理内存，也返回失败。接着，通过修改页表把触发异常的逻辑地址所在的页面映射到新分配的物理内存上，结束了一次异常处理的流程。
+
+\par
+显然，对于二级页表本身引起的缺页异常，要把新分配的二级页表的物理地址填充到一级页表中。特别注意，1个页面可以容纳4张二级页表。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-21}
+\inputminted[firstline=248,lastline=319,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
 
 \section{内存管理初始化}
-前面把epos目前所具有的内存管理功能全部列出来了。下面我们把这些功能组合起来，完成内存管理系统的初始化工作。
-\subsection{修改栈地址}
-在本章之前，我们在entry.S中为各个模式所设置的栈位于0x4000之下，因为内核被链接到了0xc0000000之上，也要相应地修改栈的地址，将来才能以链接地址运行。修改方法是在原来的地址上，全部加上内核基地址，即KERNBASE。注意，我们没有修改SVC模式的栈，因为在内核尚未开启分页之前，CPU运行在SVC模式，且需要用到SVC栈。而其他模式栈，当启用分页之后才会访问，可以先行修改。SVC模式栈将在开启分页以后进行修改，请参考4.6.2节。
+前面几节，我们完成了页表初始化、物理内存和逻辑内存管理、缺页异常的处理。下面把这些功能组合起来，完成整个内存管理系统的初始化工作。
 
-\inputminted[firstline=125,lastline=142,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter04/kernel/entry.S}
+\subsection{修改栈地址}
+在本章之前，各个模式的栈位于0x1000之下(参考代码\ref{code:3-4})。从本章开始，因为内核被链接到了3GiB之上，也要相应地修改栈的地址，将来才能以链接地址运行。修改方法是在原来的地址上，全部加上KERNBASE(=3GiB)，如代码\ref{code:4-22}所示。注意，我们没有修改supervisor模式的栈，因为在尚未开启分页之前，CPU运行在该模式。而其他模式的栈，当启用分页之后才会访问，可以先行修改。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/entry.S}
+\label{code:4-22}
+\inputminted[firstline=127,lastline=144,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter04/kernel/entry.S}
+\end{code}
 
 \subsection{启用分页}
-先解释一下end这个变量。它是一个比较特殊的变量，它不是在程序中定义的，而是在链接器脚本kernel.ld.in中定义的。它记录了链接完成后这个程序最后的地址，end之前是程序的代码、数据等信息，end标记了这些信息的结束。也就是说，end标记了程序的结束地址。因此，？？行中的变量\_end保存了程序的结束地址。PAGE\_ROUNDUP是把一个整数向上取到页面大小（即4096）的倍数。宏定义R(x)把地址x减去内核的起始基地址，即0xc000000。因此，？？行的physfree保存了内核被加载到物理内存的结束地址，亦即空闲物理内存的起始地址。
-\inputminted[firstline=368,lastline=373,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
-因为init\_paging要消耗掉一些物理内存，因此它返回了新的空闲物理内存的起始地址。
-函数init\_paging运行完成后，内核可以运行在3GiB的地址上，是时候调整SVC模式栈的地址了。
+回到内核的C语言入口函数cstart。因为要尽快启用分页，所以进入cstart后的第一件事就是调用前面的init\_paging初始化页表并启用分页。全局符号end定义在链接器脚本中(参考代码\ref{code:2-5})，它的地址，即局部变量\_end=KERNBASE+kernel.img的大小，宏定义R(x)=x-KERNBASE。局部变量physfree保存着内核被加载到物理内存的结束地址，亦即空闲物理内存的起始地址，而且通过PAGE\_ROUNDUP把它向上取整到页面大小（即4KiB）的倍数。
 
-\inputminted[firstline=375,lastline=378,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-23}
+\inputminted[firstline=339,lastline=347,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
 
-\subsection{内核堆初始化}
-在内核运行过程中，也经常需要动态地分配和释放内存。因此，内核堆对于内核的运行是非常必要的。对于堆的管理算法，我们采用了第三方的堆管理器TLSF（Two Level Segregated Fit memory allocator）。首先调用init\_frame初始化物理内存管理器，接着调用init\_vmsapce初始化逻辑地址空间，然后才能调用init\_kmalloc初始化内核堆，堆的初始大小为4MiB。注意，我们只是给堆分配了地址空间，并未分配物理内存，将来访问堆时，通过4.5节实现的缺页异常处理，自动完成物理内存的分配以及逻辑地址到物理内存的映射。
+因为init\_paging在初始化页表的时候要消耗掉一部分物理内存，因此它返回了新的空闲物理内存的起始地址。
 
-\inputminted[firstline=380,lastline=394,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\par
+函数init\_paging返回后，分页已经被开启。此时系统还能正常运行，原因就在于页表中的恒等映射，它保证了逻辑地址等于物理地址。另一方面，逻辑地址(x+KERNBASE)也被映射到了物理地址x。
 
-\subsection{外设地址映射}
-在第二、三章中，我们通过基地址MMIO\_BASE\_PA=0x20000000来访问外设。打开分页之后，不能再直接通过这种地址去访问外设了。为此，要把位于0x20000000-0x21000000的物理内存映射到逻辑地址空间中来，然后才能用逻辑地址去访问串口、定时器等外设。问题是，要把外设地址映射到那个逻辑地址位置呢？我们前面讲到，因为只给内核分配了80张二级页表，只能映射80MiB地址空间，即0xc0000000-0xc5000000。所以，我们选择MMIO\_BASE\_VA=0xC4000000，这样外设所在的逻辑地址是0xc4000000-0xc5000000。选择了映射地址之后，要通过page\_alloc\_in\_addr把这一段逻辑地址空间保留下来。需要特别注意的是，在调用page\_map映射外设地址空间时，第三个参数flags不能带L2E\_C，这是因为外设的存储不能被缓存。
+\par
+下面，我们切换到逻辑地址运行。切换工作由函数trampoline完成。单词trampoline的字面意思是蹦床，这正是该函数完成的功能，即从加载地址x蹦到逻辑地址(x+KERNBASE)上去。
 
-\inputminted[firstline=396,lastline=401,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-24}
+\inputminted[firstline=349,lastline=352,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
 
-除此之外，还得把machdep.c中的“MMIO\_BASE\_PA+AUX\_REG”的地方全部改为“MMIO\_BASE\_VA+AUX\_REG”，这样才能正确访问外设。
+这个函数的修饰符“\_\_attribute\_\_((naked))”告诉编译器不要为它生成出入口代码，函数内部只是把sp和lr寄存器加上KERNBASE，然后用“bx lr”指令返回。显然，函数返回之后sp和pc都被加上了KERNBASE，这就意味着之后的代码，已经以逻辑地址运行了。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-25}
+\inputminted[firstline=329,lastline=337,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
+
+\subsection{物理及逻辑内存初始化}
+接下来，先后调用init\_ram和init\_frame初始化物理内存管理器。根据图\ref{figure:4-7}，\_end是空闲逻辑内存的起始地址，把它向上取整到页面大小的倍数后，传给init\_frame用于映射空闲物理内存的位图。init\_frame返回新的空闲逻辑内存的起始地址。然后，调用init\_vmspace初始化内核和用户逻辑内存管理器。
+
+\par
+在内核运行过程中，也需要动态地分配和释放内存，有必要开辟一块逻辑内存作为内核堆。因此，init\_vmspace在内核的逻辑内存中预留了4MiB给内核堆使用。注意，这里只给堆分配了地址空间，并未分配物理内存。将来访问堆时，通过\ref{section:page-fault}节实现的缺页异常处理，自动完成物理内存的分配以及逻辑内存到物理内存的映射。
+
+\par
+初始化内核堆是通过调用init\_kmalloc完成的。我们采用了著名的堆分配器\htmladdnormallink{TLSF}{http://www.gii.upv.es/tlsf/}(Two-Level Segregated Fit allocator)管理内核堆。TLSF提供了malloc/realloc/memalign/free等标准的接口，这里只是根据需要做了简单的封装。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-26}
+\inputminted[firstline=354,lastline=369,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
+
+\subsection{映射外设地址}
+在第二、三章中，我们通过访问MMIO内存块[0x20000000, 0x21000000]控制外设。启用分页之后，这个逻辑内存块并未被映射到物理内存，不能再直接用它们控制外设了。为此，要把MMIO内存映射到逻辑地址空间中来，然后才能用逻辑地址去访问外设。把MMIO内存映射到哪个逻辑内存块呢？前面讲过，我们给内核分配了80张二级页表，能映射80MiB地址空间，即0xc0000000-0xc5000000。为了充分利用这80张页表，我们把MMIO内存映射到逻辑地址[0xc4000000, 0xc5000000]。选择了映射地址之后，通过page\_alloc\_in\_addr把这一块逻辑内存登记到地址空间vmzone中，然后调用函数page\_map完成映射关系。需要特别注意的是，在调用page\_map时，页表项标志位flags不能带L2E\_C，这是因为MMIO内存不能被缓存。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-27}
+\inputminted[firstline=371,lastline=376,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
+
+除此之外，还得把源代码中的“MMIO\_BASE\_PA+XXX\_REG”的地方全部改为“MMIO\_BASE\_VA+XXX\_REG”，然后才能正常访问外设。
 
 \subsection{开启HiVecs功能}
-在ARM早期的版本中，异常向量只能在地址0，也就是说当发生IRQ时，PC=0x18；data abort时PC=0x10；prefetch abort时PC=0xc等等。所以，操作系统至少必须保留逻辑地址空间的第一个页面，把异常向量放在里面。在ARM720T之后，支持所谓的HiVecs，即异常向量可以在地址0xffff0000。开启HiVecs后，当发生IRQ时PC=0xffff0018，data abort时PC=0xffff0010，prefetch abort时PC=0xffff000c等等。
-因此，我们先把0xffff0000-0xffff1000这个页面用page\_alloc\_in\_addr保留下来，然后用page\_map把它映射到物理内存的0地址（因为异常向量表保存在物理地址0的位置）。这样就把异常向量搬到了0xffff0000地址上去，然后通过修改系统控制寄存器SCTLR开启hivecs模式。
+在ARM早期的版本中，异常向量的基地址只能是0，即复位时PC=0、IRQ时PC=0x18等等，如图\ref{figure:4-8}所示。所以，内核必须保留逻辑地址空间的第一个页面[0, 0x1000]用于放置异常向量。在ARM720T之后，支持所谓的HiVecs，即异常向量的基地址可以是0xffff0000。开启HiVecs后，复位时PC=0xffff0000、IRQ时PC=0xffff0018等等，见图\ref{figure:4-8}。
 
-\inputminted[firstline=403,lastline=420,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.3]{figures/4-8}
+\caption{触发异常时PC的值}
+\label{figure:4-8}
+\end{figure}
+
+因此，我们先把[0xffff0000, 0xffff1000]这一个页面用page\_alloc\_in\_addr预留下来，然后用page\_map把它映射到物理地址0x8000(因为异常向量表位于kernel.img的开始位置，而kernel.img被加载到物理地址0x8000)。这样就把异常向量挪到了逻辑地址0xffff0000上，然后通过修改系统控制寄存器SCTLR开启HiVecs模式。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-28}
+\inputminted[firstline=378,lastline=396,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
 
 \subsection{取消恒等映射}
-经过上面的初始化步骤，我们的内核已经运行在事先设定的逻辑地址空间之中，是时候清理一下逻辑地址空间了。首先，内核已经不再需要恒等映射，通过把把一级页表PTD中的前80项全部清零，即取消了恒等映射。恒等映射保证了内核顺利地从加载地址过渡到链接地址，其作用就像初生胎儿的脐带，生产之后必须切断，走出作为独立个体的第一步。接下来，取消0xc0001000-0xc0004000之间的地址空间(0xc0000000-0xc0001000是各个模式的栈，不能取消；0xc0004000-0xc0008000是一级页表，也不能取消)。最后，清空整个TLB缓存，以使修改立即生效。
+经过前面的初始化步骤，内核已经运行于设定的链接地址，而且中断和缺页异常发生时，会直接跳转到Hivecs，不再需要恒等映射。取消恒等映射很简单，只要把一级页表的前80(=NR\_KERN\_PAGETABLE)项全部清零即可，代码\ref{code:4-29}中的全局变量PTD是指向一级页表的指针。然后，清空整个TLB缓存，以使修改立即生效。
 
-\inputminted[firstline=422,lastline=431,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-29}
+\inputminted[firstline=398,lastline=410,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
 
-至此，逻辑地址空间的布局如图所示。物理内存的布局如图所示。
+至此，物理内存和逻辑内存的布局如图\ref{figure:4-9}所示。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.3]{figures/4-9}
+\caption{物理内存和逻辑内存的布局}
+\label{figure:4-9}
+\end{figure}
+
+\section{测试}
+从表面上看，本章没有增加新的功能，只是通过分页给内核搬了个家。如果make之后，还能看到图\ref{figure:3-6}的输出，表明搬家成功了。
+
+\par
+为了进一步验证，我们用代码\ref{code:4-30}进行了简单的测试。
+
+\begin{code}
+\captionof{listing}{chapter04/kernel/machdep.c}
+\label{code:4-30}
+\inputminted[firstline=438,lastline=447,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\end{code}
+
+结果如图\ref{figure:4-10}所示。其中，点“.”是定时器中断处理函数的输出。因为用户地址空间[0, 0xbfc00000)是空的，所以446行访问0地址时会触发无法处理的缺页异常。注意，中断或异常发生时，CPU会自动屏蔽中断(CPSR.I=1)，所以后面看不到定时器中断的输出。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.5]{figures/4-10}
+\caption{测试结果输出}
+\label{figure:4-10}
+\end{figure}
+
+从打印的信息可以看到，引起缺页异常的地址是0x00000000，状态码0x00000805表示translation section fault。这是因为0地址的页表项所在的二级页表没有映射到物理内存。
+
+\par
+根据PC寄存器的值，我们知道访问0地址发生在0xc0008a14位置。图\ref{figure:4-11}是命令“arm-none-eabi-objdump -D kernel.elf”的输出，从中可以看出0xc0008a14正是对应源代码446行中“*p=0”的语句。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.5]{figures/4-11}
+\caption{通过PC寄存器找到异常发生时正在执行的指令}
+\label{figure:4-11}
+\end{figure}
+
+\section{小结}
+本章通过分页实现了一个基本的内存管理框架。尽管没有增加系统的功能，但是为后续开发准备了立脚点。
 
 \clearpage
 \ifxetex\else\end{CJK*}\fi

@@ -82,7 +82,6 @@ void disable_irq(uint32_t irq)
 
 void irq_handler(struct context *ctx)
 {
-
     int irq;
     intr_reg_t *pic = (intr_reg_t *)(MMIO_BASE_PA+INTR_REG);
 
@@ -127,11 +126,12 @@ static void init_pit(uint32_t freq)
     pit->reload = pit->load;
     pit->predivider = (SYS_CLOCK_FREQ/timer_clock)-1;
     pit->control = ARMTIMER_CTRL_23BIT |
-                ARMTIMER_CTRL_PRESCALE_1 |
-                ARMTIMER_CTRL_INTR_ENABLE |
-                ARMTIMER_CTRL_ENABLE;
+                   ARMTIMER_CTRL_PRESCALE_1 |
+                   ARMTIMER_CTRL_INTR_ENABLE |
+                   ARMTIMER_CTRL_ENABLE;
 }
 
+__attribute__((noreturn))
 void cstart(void)
 {
     {

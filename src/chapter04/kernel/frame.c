@@ -43,11 +43,7 @@ uint32_t init_frame(uint32_t brk)
         pmzone[z].limit -= size;
         if(pmzone[z].limit == 0)
             continue;
-/*
-        printk("RAM: 0x%08x - 0x%08x (%d frames)\r\n",
-                pmzone[z].base, pmzone[z].base+pmzone[z].limit,
-                pmzone[z].limit/PAGE_SIZE);
-*/
+
         page_map(brk, paddr, size/PAGE_SIZE, L2E_V|L2E_W|L2E_C);
         pmzone[z].bitmap=bitmap_create_in_buf(bit_cnt, (void *)brk, 0);
         brk += size;

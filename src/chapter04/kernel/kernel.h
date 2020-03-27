@@ -37,12 +37,18 @@ void sti(), cli();
 #define RAM_ZONE_LEN (2 * 8)
 extern uint32_t g_ram_zone[RAM_ZONE_LEN];
 
-#define VADDR(pdi, pti) ((uint32_t)(((pdi)<<PGDR_SHIFT)|((pti)<<PAGE_SHIFT)))
+#define VADDR(pdi, pti) ((uint32_t)(((pdi)<<PGDR_SHIFT)|\
+                                    ((pti)<<PAGE_SHIFT)))
 
 #define KERN_MAX_ADDR VADDR(0xFFF, 0xFF)
 #define KERN_MIN_ADDR VADDR(0xC00, 0x04)
 #define USER_MAX_ADDR VADDR(0xBFC, 0x00)
 #define USER_MIN_ADDR VADDR(4, 0)
+
+extern uint32_t *PTD;
+extern uint32_t *PT;
+#define vtopte(va) (PT+((va)>>PAGE_SHIFT))
+#define vtop(va) (((*vtopte(va))&(~PAGE_MASK))|((va)&PAGE_MASK))
 
 #define KERNBASE  VADDR(0xC00, 0)
 #define R(x) ((x)-KERNBASE)
@@ -55,10 +61,6 @@ extern uint32_t g_ram_zone[RAM_ZONE_LEN];
         (uint32_t)(va) + (len) <= USER_MAX_ADDR)
 
 extern uint8_t   end;
-extern uint32_t *PTD;
-extern uint32_t *PT;
-#define vtopte(va) (PT+((va)>>PAGE_SHIFT))
-#define vtop(va) (((*vtopte(va))&(~PAGE_MASK))|((va)&PAGE_MASK))
 
 void     init_vmspace(uint32_t brk);
 uint32_t page_alloc(int npages, uint32_t prot, uint32_t user);

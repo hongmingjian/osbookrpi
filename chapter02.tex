@@ -45,7 +45,7 @@ cstart函数比较简单，它首先初始化串口，波特率设置为9600，�
 \begin{code}
 \captionof{listing}{chapter02/kernel/machdep.c}
 \label{code:2-4}
-\inputminted[firstline=50,lastline=60,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter02/kernel/machdep.c}
+\inputminted[firstline=50,lastline=61,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter02/kernel/machdep.c}
 \end{code}
 
 
@@ -88,8 +88,8 @@ cstart函数比较简单，它首先初始化串口，波特率设置为9600，�
 \noindent
 -Tkernel.ld提供了链接器脚本，-nostdlib表示不要使用默认的启动代码和标准函数库，因为它们是为普通应用程序准备的。需要特别注意的是，entry.o必须是该命令的第一个目标文件，以确保它定义的\_entry符号地址是0x8000。
 \par
-链接器输出的文件kernel.elf是一个ELF格式的程序文件。为了验证链接器是否生成了正确的代码，可以用objdump进行反汇编(-d)，
-\mint[breaklines]{bat}@arm-none-eabi-objdump -d kernel.elf@
+链接器输出的文件kernel.elf是一个ELF格式的程序文件。为了验证链接器是否生成了正确的代码，可以用objdump进行反汇编(-D)，
+\mint[breaklines]{bat}@arm-none-eabi-objdump -D kernel.elf@
 \noindent
 结果如图\ref{figure:2-1}所示。可以看出，指令从0x8000开始，右边的汇编指令与entry.S完全一致。
 

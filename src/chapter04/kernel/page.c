@@ -35,10 +35,10 @@ static struct vmzone *kvmzone;
 
 static struct vmzone *uvmzone;
 
-void init_vmspace(uint32_t brk)
+void init_vmspace(uint32_t virtfree)
 {
     km0.base = USER_MAX_ADDR;
-    km0.limit = brk - km0.base;
+    km0.limit = virtfree - km0.base;
     km0.protect = VM_PROT_ALL;
     km0.next = NULL;
     kvmzone = &km0;
@@ -240,7 +240,8 @@ uint32_t page_prot(uint32_t va)
  * 把从vaddr开始的虚拟地址，映射到paddr开始的物理地址。
  * 共映射npages页面，把PTE的标志位设为flags
  */
-void page_map(uint32_t vaddr, uint32_t paddr, uint32_t npages, uint32_t flags)
+void page_map(uint32_t vaddr, uint32_t paddr, uint32_t npages,
+              uint32_t flags)
 {
     for (; npages > 0; npages--){
         *vtopte(vaddr) = paddr | flags;

@@ -20,10 +20,17 @@ OBJDUMP= $(CROSS)objdump
 
 PROG=    kernel
 
-CPPFLAGS+=-nostdinc -I../include                      #C预处理的选项
-ASFLAGS=-Wall -O2                                     #汇编器的选项
-CFLAGS+=-Wall -O2 -ffreestanding -fleading-underscore #C编译器的选项
-LDFLAGS+=-Tkernel.ld -nostdlib                        #链接器的选项
+#C预处理器的选项
+CPPFLAGS+=-nostdinc -I../include
+
+#汇编器的选项
+ASFLAGS=-Wall -O2
+
+#C编译器的选项
+CFLAGS+=-Wall -O2 -ffreestanding -fleading-underscore
+
+#链接器的选项
+LDFLAGS+=-Tkernel.ld -nostdlib
 
 COBJS=machdep.o
 

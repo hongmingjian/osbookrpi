@@ -54,7 +54,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-1}
-\inputminted[firstline=71,lastline=104,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=73,lastline=104,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 可以看出，真正有效的只有reset和irq两项。因为kernel.img被加载到0x8000这个地址，从\_entry开始的异常向量表位于0x8000，而CPU希望异常向量表在0地址。因此，我们要把异常向量表从0x8000复制到0x0地址，才能保证异常的正常处理。复制异常向量表如代码\ref{code:3-2}所示。
@@ -62,7 +62,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-2}
-\inputminted[firstline=104,lastline=112,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=106,lastline=112,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 在C语言中，要把未初始化的全局或静态变量全部置0。编译器会把这些变量统一放在一个称为BSS(Block Started by Symbol)的段中。在链接器脚本kernel.ld.in(代码\ref{code:2-5})中，我们定义的两个符号\_edata和\_end，分别标识了BSS段的开始和结束。在调用C程序之前，要确保这部分变量的值是0。这正是代码\ref{code:3-3}的功能。
@@ -70,14 +70,14 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-3}
-\inputminted[firstline=112,lastline=121,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=114,lastline=123,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 接下来，为各个异常模式设置栈。记住，当前CPU正运行在supervisor模式。我们按照顺序先后为undefined、abort、IRQ和supervisor模式设置了栈。我们只给undefined、abort和IRQ的栈分配了12个字节。后面我们会看到，12个字节就够了。Supervisor的栈稍微大一点，从(0x1000-36)开始往0地址延伸。
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-4}
-\inputminted[firstline=121,lastline=143,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=125,lastline=142,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 在实际应用中，绝大部分代码运行在两种模式：user和supervisor模式。user模式用于运行用户应用程序，supervisor模式用于运行操作系统内核。
@@ -101,7 +101,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-6}
-\inputminted[firstline=143,lastline=151,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=147,lastline=153,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 此时sp指向IRQ模式的栈顶(即0x1000-24)，(r14-4)保存了中断返回的地址，SPSR中保存了中断前的CPSR。我们先把返回地址(r14-4)存到栈上，即
@@ -109,14 +109,14 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-7}
-\inputminted[firstline=38,lastline=41,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=40,lastline=43,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 保存lr之后，现在lr可以作为通用寄存器。因此，我们先把SPSR(即中断前的CPSR)也存到栈上。
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-8}
-\inputminted[firstline=42,lastline=43,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=44,lastline=45,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 至此，两个最重要的寄存器已经保存起来了。现在，我们要切换回supervisor模式去处理中断。问题是，我们切换到supervisor模式后，怎么才能记住IRQ模式栈的位置，将来才能从中取出中断返回地址和SPSR呢？为此，我们约定一个寄存器来保存IRQ模式栈的位置，而且这个通用寄存器不能受到模式切换的影响。为了简单起见，就用r0。因为我们不能修改r0的值，因此先把它存到IRQ模式栈上，然后让r0指向IRQ模式栈顶的位置。
@@ -124,7 +124,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-9}
-\inputminted[firstline=44,lastline=46,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=46,lastline=48,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 特别要注意最后一条语句，它还原了IRQ模式栈的位置，以保证下次发生IRQ异常时，IRQ模式栈还是指向(0x1000-24)。因此，我们在IRQ模式栈上保存了中断返回地址、SPSR和r0，共12个字节。
@@ -134,7 +134,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-10}
-\inputminted[firstline=47,lastline=50,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=49,lastline=52,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 此时，CPU已经运行在supervisor模式。我们把整个中断现场保存在supervisor模式栈中。首先为中断现场预留空间，然后把刚才保存在IRQ模式栈中的中断返回地址、SPSR和r0复制过来。
@@ -142,14 +142,14 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-11}
-\inputminted[firstline=51,lastline=57,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=53,lastline=59,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 现在，可以保存中断发生时所有的寄存器。
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-12}
-\inputminted[firstline=58,lastline=61,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=60,lastline=63,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 至此，我们已经在supervisor模式栈上保存了现场，即struct context结构体，而且sp含有指向该结构体的指针。
 
@@ -159,7 +159,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-13}
-\inputminted[firstline=63,lastline=69,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=65,lastline=71,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 回到前面的irq。PUSHCONTEXT之后，调用C语言的中断处理程序irq\_handler，把现场context的指针当作参数通过r0寄存器传递给它。把中断现场传给中断处理函数，是考虑到在处理中断的过程中，可能需要了解中断发生时的状态信息。
@@ -167,7 +167,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-14}
-\inputminted[firstline=145,lastline=151,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=147,lastline=153,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 下面我们来看irq\_handler，它的主要工作是判断哪个设备发生了中断，然后根据中断请求号码调用对应的中断处理函数。BCM2835有72个中断源，其中ARM侧的中断源8个，GPU侧64个，如图\ref{figure:3-3}和\ref{figure:3-4}所示。
@@ -191,7 +191,7 @@ ARM提供了7种运行模式，分别是user、system、supervisor、IRQ、FIQ�
 \begin{code}
 \captionof{listing}{chapter03/kernel/machdep.c}
 \label{code:3-15}
-\inputminted[firstline=83,lastline=117,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/machdep.c}
+\inputminted[firstline=83,lastline=116,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/machdep.c}
 \end{code}
 
 \noindent
@@ -232,7 +232,7 @@ BCM2835内部集成了一片定时器AP804，下面我们对它进行初始化�
 \begin{code}
 \captionof{listing}{chapter03/kernel/machdep.c}
 \label{code:3-18}
-\inputminted[firstline=119,lastline=133,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/machdep.c}
+\inputminted[firstline=118,lastline=132,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/machdep.c}
 \end{code}
 
 下面来实现定时器的中断处理函数。首先，我们定义了一个全局变量g\_timer\_ticks记录定时器中断的次数。然后，为了验证定时器中断系统是否能工作，定时器中断一次，便往串口输出一个点。
@@ -240,7 +240,7 @@ BCM2835内部集成了一片定时器AP804，下面我们对它进行初始化�
 \begin{code}
 \captionof{listing}{chapter03/kernel/kernel.c}
 \label{code:3-19}
-\inputminted[firstline=3,lastline=23,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/kernel.c}
+\inputminted[firstline=4,lastline=23,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/kernel.c}
 \end{code}
 
 注意，在处理完中断后，要清除定时器的中断未决标志，表示本次中断处理完了，准备接收下一次中断。这个工作已经在irq\_handler中完成了，见代码\ref{code:3-15}中的110-115行。
@@ -251,7 +251,7 @@ BCM2835内部集成了一片定时器AP804，下面我们对它进行初始化�
 \begin{code}
 \captionof{listing}{chapter03/kernel/machdep.c}
 \label{code:3-20}
-\inputminted[firstline=135,lastline=166,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/machdep.c}
+\inputminted[firstline=134,lastline=166,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter03/kernel/machdep.c}
 \end{code}
 
 函数sti和对应的关闭中断请求函数cli定义在entry.S中，如代码\ref{code:3-20}所示。
@@ -259,7 +259,7 @@ BCM2835内部集成了一片定时器AP804，下面我们对它进行初始化�
 \begin{code}
 \captionof{listing}{chapter03/kernel/entry.S}
 \label{code:3-21}
-\inputminted[firstline=153,lastline=166,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
+\inputminted[firstline=155,lastline=168,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter03/kernel/entry.S}
 \end{code}
 
 好了，代码写完了，回到命令行敲make生成kernel.img，把kernel.img复制到SD卡，插入树莓派并打开电源，在串口输出中可以看到树莓派正在打点，如图\ref{figure:3-6}所示。这说明中断系统已经可以工作了。
@@ -270,6 +270,9 @@ BCM2835内部集成了一片定时器AP804，下面我们对它进行初始化�
 \caption{定时器中断的输出}
 \label{figure:3-6}
 \end{figure}
+
+\section{小结}
+本章在第二章的基础上，加上了中断处理的功能，重点讲解了中断现场的保存与恢复。最后，以定时器中断为例子，演示了中断处理的流程。
 
 \clearpage
 \ifxetex\else\end{CJK*}\fi

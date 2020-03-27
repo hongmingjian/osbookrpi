@@ -47,6 +47,7 @@ void sys_putchar ( int c )
     aux->mu_io = c & 0xff;
 }
 
+__attribute__((noreturn))
 void cstart(void)
 {
     char *s="Hello, world!\r\n";

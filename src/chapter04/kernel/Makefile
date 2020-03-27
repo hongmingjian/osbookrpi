@@ -20,9 +20,11 @@ PROG=		kernel
 CPPFLAGS+=-nostdinc -I../include
 ASFLAGS=-Wall -O2 -D__ASSEMBLY__
 CFLAGS+=-Wall -O2 -ffreestanding  -fleading-underscore
-LDFLAGS+=-Tldscript -nostdlib -nostartfiles -nodefaultlibs
+LDFLAGS+=-Tkernel.ld -nostdlib
 
-COBJS=machdep.o printk.o kernel.o bitmap.o frame.o page.o kmalloc.o ../lib/tlsf/tlsf.o ../lib/snprintf.o ../lib/string.o ../lib/softfloat.o ../lib/memset.o ../lib/memcpy.o
+COBJS=machdep.o printk.o kernel.o bitmap.o frame.o page.o kmalloc.o
+COBJS+=../lib/tlsf/tlsf.o ../lib/snprintf.o ../lib/string.o \
+       ../lib/softfloat.o ../lib/memset.o ../lib/memcpy.o
 OBJS=entry.o $(COBJS)
 
 all: $(PROG).img
@@ -30,12 +32,12 @@ all: $(PROG).img
 $(PROG).img: $(PROG).elf
 	$(OBJCOPY) $^ -O binary $@
 
-$(PROG).elf: ldscript $(OBJS)
-	$(CC) $(LDFLAGS) $(OBJS) -o $@  
+$(PROG).elf: kernel.ld $(OBJS)
+	$(CC) $(LDFLAGS) $(OBJS) -o $@
 
-ldscript: ldscript.in
+kernel.ld: kernel.ld.in
 	$(CC) -E -P -x c-header -o $@ $^
-	
+
 .PHONY: clean
 clean:
-	-$(RM) ldscript $(OBJS) $(PROG).img $(PROG).elf $(PROG).map *.*~
+	-$(RM) $(OBJS) $(PROG).{ld,img,elf}

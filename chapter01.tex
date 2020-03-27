@@ -45,10 +45,13 @@
 \subsection{软件环境}
 \begin{itemize}
 \item 首先，把SD卡格式化成FAT32文件系统，然后从\htmladdnormallink{GitHub}{https://github.com/raspberrypi/firmware/}下载bootcode.bin和start.elf两个文件并复制到SD卡的根目录下。bootcode.bin和start.elf是树莓派的引导程序，功能上类似于IBM-PC上的BIOS。
-\item 因为在开发过程中需要用到一些Unix/Linux平台的工具软件，所以如果在 Windows 下面做开发，要安装\htmladdnormallink{MSYS2}{https://www.msys2.org}。
 \item 从ARM公司\htmladdnormallink{官网}{https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm}下载GNU工具链，解压缩后把arm-none-eabi/bin加入到路径PATH中。
-\item 准备一个查看串口输出的工具，在Windows平台上，可以使用\htmladdnormallink{PuTTY}{https://www.putty.org}；Unix/Linux可以使用\htmladdnormallink{screen}{https://www.gnu.org/software/screen/}。
+\item 在开发过程中需要用到GNU make。如果你在Windows中做开发，可以去\htmladdnormallink{这里}{https://github.com/mbuilov/gnumake-windows}下载编译好的版本。
+\item 准备一个查看串口输出的工具。在Windows中，可以使用\htmladdnormallink{PuTTY}{https://www.putty.org}；Unix/Linux中用\htmladdnormallink{screen}{https://www.gnu.org/software/screen/}就很好了。
+
+\iffalse
 \item \htmladdnormallink{QEMU}{https://www.qemu.org}可以模拟树莓派的部分功能，在后期的开发测试过程中，为了提高开发效率，可以用QEMU来代替，以避免反复的插拔SD卡。在前期开发过程中，不建议用QEMU模拟器。
+\fi
 \end{itemize}
 
 \clearpage
