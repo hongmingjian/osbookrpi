@@ -40,37 +40,37 @@
 #define MODSTK_SIZE 12
 
 #define PUSHCONTEXT                     \
-    sub     lr, lr, #4;                 \
-    sub     r13, r13, #MODSTK_SIZE;     \
-    str     lr, [r13, #MODSTK_LR];      \
-    mrs     lr, spsr;                   \
-    str     lr, [r13, #MODSTK_SPSR];    \
-    str     r0, [r13, #MODSTK_R0];      \
-    mov     r0, r13;                    \
-    add     r13, r13, #MODSTK_SIZE;     \
-    mrs     r14, cpsr;                  \
-    bic     r14, r14, #PSR_MODE_MASK;   \
-    orr     r14, r14, #PSR_MODE_SVC;    \
-    msr     cpsr_cxsf, r14;             \
-    sub     sp, sp, #CTX_SIZE;          \
-    str     lr, [sp, #CTX_SVC_LR];      \
-    ldr     lr, [r0, #MODSTK_LR];       \
-    str     lr, [sp, #CTX_PC];          \
-    ldr     r14, [r0, #MODSTK_SPSR];    \
-    str     r14, [sp, #CTX_SPSR];       \
-    ldr     r0, [r0, #MODSTK_R0];       \
-    add     r14, sp, #4;                \
-    stmia   r14!, {r0-r12};             \
-    stmia   r14, {r13, r14}^;           \
-    str     sp, [sp, #CTX_SVC_SP]
+    sub   lr, lr, #4;                    \
+    sub   sp, sp, #MODSTK_SIZE;   /*12*/ \
+    str   lr, [sp, #MODSTK_LR];   /* 8*/ \
+    mrs   r14, spsr;                     \
+    str   r14, [sp, #MODSTK_SPSR];/* 4*/ \
+    str   r0, [sp, #MODSTK_R0];   /* 0*/ \
+    mov   r0, sp;                        \
+    add   sp, sp, #MODSTK_SIZE;   /*12*/ \
+    mrs   r14, cpsr;                     \
+    bic   r14, r14, #PSR_MODE_MASK;      \
+    orr   r14, r14, #PSR_MODE_SVC;       \
+    msr   cpsr_cxsf, r14;                \
+    sub   sp, sp, #CTX_SIZE;      /*76*/ \
+    str   r14, [sp, #CTX_SVC_LR]; /*68*/ \
+    ldr   r14, [r0, #MODSTK_LR];  /* 8*/ \
+    str   r14, [sp, #CTX_PC];     /*72*/ \
+    ldr   r14, [r0, #MODSTK_SPSR];/* 4*/ \
+    str   r14, [sp, #CTX_SPSR];   /* 0*/ \
+    ldr   r0, [r0, #MODSTK_R0];   /* 0*/ \
+    add   r14, sp, #4;                   \
+    stmia r14!, {r0-r12};                \
+    stmia r14, {r13, r14}^;              \
+    str   sp, [sp, #CTX_SVC_SP];  /*64*/
 
-#define PULLCONTEXT                     \
-    ldmia   sp!, {r0};                  \
-    msr     spsr, r0;                   \
-    ldmia   sp!, {r0-r12};              \
-    ldmia   sp, {r13, r14}^;            \
-    add     sp, sp, #(3*4);             \
-    ldmia   sp!, {lr, pc}^
+#define PULLCONTEXT                      \
+    ldmia sp!, {r0};                     \
+    msr   spsr, r0;                      \
+    ldmia sp!, {r0-r12};                 \
+    ldmia sp, {r13, r14}^;               \
+    add   sp, sp, #(3*4);                \
+    ldmia sp!, {lr, pc}^
 
     .extern _cstart               @声明cstart是外部符号
     .extern _edata, _end          @这两个符号在链接器脚本kernel.ld.in中定义
@@ -79,7 +79,7 @@
     .text                         @代码段开始
     .globl _entry                 @声明_entry是全局符号
 _entry:
-    ldr pc, vector_reset          @把PC设置为vector_reset处的值
+    ldr pc, vector_reset          @把PC设置为vector_reset处的值,即reset
     ldr pc, vector_undefined      @把PC设置为vector_undefined处的值
     ldr pc, vector_swi            @把PC设置为vector_swi处的值
     ldr pc, vector_prefetch_abort @把PC设置为vector_prefetch_abort处的值
@@ -106,7 +106,7 @@ vector_fiq:
     .word 0
 
 reset:
-    mov r0, #LOADADDR
+    mov r0, #LOADADDR @=0x8000
     mov r1, #0x0000
     ldmia r0!, {r2-r9}
     stmia r1!, {r2-r9}
@@ -143,8 +143,8 @@ zeroify.1:
     msr cpsr_cxsf, r1
     ldr sp, =(0x1000-36)
 
-    /* Now enter the C main function... */
-    b _cstart
+    /* Now enter the C function ... */
+    b _cstart                     @跳转到_cstart执行
 
 irq:
     PUSHCONTEXT

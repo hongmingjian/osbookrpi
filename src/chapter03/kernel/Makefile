@@ -20,13 +20,24 @@ OBJDUMP= $(CROSS)objdump
 
 PROG=    kernel
 
+#C预处理器的选项
 CPPFLAGS+=-nostdinc -I../include
+
+#汇编器的选项
 ASFLAGS=-Wall -O2
+
+#C编译器的选项
 CFLAGS+=-Wall -O2 -ffreestanding -fleading-underscore
+
+#链接器的选项
 LDFLAGS+=-Tkernel.ld -nostdlib
 
 COBJS=machdep.o kernel.o
+
+#entry.o必须是第一个目标文件
 OBJS=entry.o $(COBJS)
+
+all: $(PROG).img
 
 $(PROG).img: $(PROG).elf
 	$(OBJCOPY) $^ -O binary $@

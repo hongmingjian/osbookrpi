@@ -10,22 +10,19 @@
 
 void sys_putchar ( int c );
 
-int printk(const char *fmt,...);
-////////////////////////////////////////////////
-
-/*ÖĞ¶ÏÏòÁ¿±í*/
+/*ä¸­æ–­å‘é‡è¡¨*/
 extern void (*g_intr_vector[])(uint32_t irq, struct context *ctx);
 
-/*ÈÃÖĞ¶Ï¿ØÖÆÆ÷´ò¿ªÄ³¸öÖĞ¶Ï*/
-void disable_irq(uint32_t irq);
-
-/*ÈÃÖĞ¶Ï¿ØÖÆÆ÷¹Ø±ÕÄ³¸öÖĞ¶Ï*/
+/*è®©ä¸­æ–­æ§åˆ¶å™¨æ‰“å¼€æŸä¸ªä¸­æ–­*/
 void enable_irq(uint32_t irq);
 
-/*¶¨Ê±Æ÷ÒÔHZµÄÆµÂÊÖĞ¶ÏCPU*/
+/*è®©ä¸­æ–­æ§åˆ¶å™¨å…³é—­æŸä¸ªä¸­æ–­*/
+void disable_irq(uint32_t irq);
+
+/*å®šæ—¶å™¨ä»¥HZçš„é¢‘ç‡ä¸­æ–­CPU*/
 #define HZ   100
 
-/*¼ÇÂ¼ÏµÍ³Æô¶¯ÒÔÀ´£¬¶¨Ê±Æ÷ÖĞ¶ÏµÄ´ÎÊı*/
+/*è®°å½•å®šæ—¶å™¨ä¸­æ–­çš„æ¬¡æ•°*/
 extern unsigned volatile g_timer_ticks;
 
 void isr_default(uint32_t irq, struct context *ctx);
@@ -33,7 +30,8 @@ void isr_timer(uint32_t irq, struct context *ctx);
 
 void sti(), cli();
 
-////////////////////////////////////////////////////////
+int printk(const char *fmt,...);
+
 #define RAM_ZONE_LEN (2 * 8)
 extern uint32_t g_ram_zone[RAM_ZONE_LEN];
 

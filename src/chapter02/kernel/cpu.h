@@ -1,9 +1,9 @@
 #ifndef _CPU_H
 #define _CPU_H
 
+#define MMIO_BASE_PA   0x20000000
 #define SYS_CLOCK_FREQ 250000000UL
-
-#define MMIO_BASE_PA 0x20000000
+#define LOADADDR       0x8000
 
 #define AUX_REG (0x215000)
 typedef struct {

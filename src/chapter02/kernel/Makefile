@@ -37,6 +37,8 @@ COBJS=machdep.o
 #entry.o必须是第一个目标文件
 OBJS=entry.o $(COBJS)
 
+all: $(PROG).img
+
 $(PROG).img: $(PROG).elf
 	$(OBJCOPY) $^ -O binary $@
 
