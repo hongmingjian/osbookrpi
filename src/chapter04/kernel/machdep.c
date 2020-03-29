@@ -12,7 +12,7 @@ static void init_uart(uint32_t baud)
   aux->enables = 1; // enable mini UART
   aux->mu_ier = 0;  // no interrupts
   aux->mu_cntl = 0; // disable transmitter & receiver
-  aux->mu_lcr = 1;  // 8bit
+  aux->mu_lcr = 3;  // 8bit
   aux->mu_mcr = 0;  // RTS line high
   aux->mu_baud = (SYS_CLOCK_FREQ/(8*baud))-1;
 
