@@ -114,10 +114,8 @@ reset:
     stmia r1!, {r2-r9}
 
     @ zeroify bss
-    ldr r0, =_edata @BSS段起始和
-    ldr r1, =_end   @           结束地址
-    sub r0, r0, #KERNBASE
-    sub r1, r1, #KERNBASE	
+    ldr r0, =R(_edata) @BSS段起始和
+    ldr r1, =R(_end)   @           结束地址
     ldr r2, =0x0
 zeroify:
     cmp   r1, r0

@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#include "board.h"
+#include "cpu.h"
 #include "kernel.h"
 
 static void init_uart(uint32_t baud)

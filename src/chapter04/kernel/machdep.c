@@ -185,9 +185,9 @@ static uint32_t init_paging(uint32_t physfree)
   }
 
   /*
-   * 设置恒等映射，填充二级页表
+   * 填充二级页表
    * 映射逻辑地址[0, R(_end)]和[KERNBASE, _end]到
-   * 物理地址为[0, R(_end)]
+   * 物理地址[0, R(_end)]
    */
   for(i = 0; i < (uint32_t)ptpte; i+=PAGE_SIZE)
     pte[i>>PAGE_SHIFT] = i|L2E_V|L2E_W|L2E_C;
@@ -227,7 +227,7 @@ static void init_ram(uint32_t physfree)
   g_ram_zone[3] = 0;
 }
 
-void panic(struct context *ctx) __attribute__((noreturn));
+__attribute__((noreturn))
 void panic(struct context *ctx)
 {
   printk("SPSR  : 0x%08x\r\n", ctx->spsr);

@@ -37,7 +37,7 @@
 #define MODSTK_LR   8
 #define MODSTK_SIZE 12
 
-#define PUSHCONTEXT                     \
+#define PUSHCONTEXT                      \
     sub   lr, lr, #4;                    \
     sub   sp, sp, #MODSTK_SIZE;   /*12*/ \
     str   lr, [sp, #MODSTK_LR];   /* 8*/ \

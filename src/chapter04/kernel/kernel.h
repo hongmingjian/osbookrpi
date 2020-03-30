@@ -60,7 +60,7 @@ extern uint32_t *PT;
 
 extern uint8_t   end;
 
-void     init_vmspace(uint32_t brk);
+void     init_vmspace(uint32_t virtfree);
 uint32_t page_alloc(int npages, uint32_t prot, uint32_t user);
 uint32_t page_alloc_in_addr(uint32_t va, int npages, uint32_t prot);
 int      page_free(uint32_t va, int npages);
@@ -75,7 +75,7 @@ uint32_t page_prot(uint32_t va);
 void     page_map(uint32_t vaddr, uint32_t paddr, uint32_t npages, uint32_t flags);
 void     page_unmap(uint32_t vaddr, uint32_t npages);
 
-uint32_t init_frame(uint32_t brk);
+uint32_t init_frame(uint32_t virtfree);
 uint32_t frame_alloc(uint32_t npages);
 uint32_t frame_alloc_in_addr(uint32_t pa, uint32_t npages);
 void     frame_free(uint32_t paddr, uint32_t npages);
@@ -84,6 +84,5 @@ void  init_kmalloc(void *mem, size_t bytes);
 void *kmalloc(size_t bytes);
 void *krealloc(void *oldptr, size_t size);
 void  kfree(void *ptr);
-void *aligned_kmalloc(size_t bytes, size_t align);
-void  aligned_kfree(void *ptr);
+void *kmemalign(size_t align, size_t bytes);
 #endif /*_KERNEL_H*/

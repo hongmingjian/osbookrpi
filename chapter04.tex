@@ -3,7 +3,7 @@
 \begin{document}
 \ifxetex\else\begin{CJK*}{UTF8}{song}\fi
 
-\chapter{内存管理（上）}
+\chapter{内存管理(上)}
 内存管理是操作系统的基本功能之一。在主流的操作系统中，一般都通过分页实现虚拟内存，给每个进程分配了一个巨大、连续、私有的虚拟内存，极大地简化了进程的内存管理。不仅如此，分页还允许进程之间共享内存，提高了物理内存的利用率。在32位操作系统中，4GiB的地址空间一般采用3:1布局，即0-3GiB给用户代码，3-4GiB留给内核。
 
 \par
@@ -60,12 +60,12 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \inputminted[firstline=1,lastline=12,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/kernel.ld.in}
 \end{code}
 
-修改链接地址后，相应地要修改vector\_reset处的值。根据新的链接地址，\_entry的地址是0xc0008000，而reset的地址是0xc0008040。CPU复位时，这个地址显然是无效的，而真正有效的地址是R(reset)，即0x8040。这正是代码\ref{code:4-2}中92行。
+修改链接地址后，相应地要修改vector\_reset处的值。根据新的链接地址，\_entry的地址是0xc0008000，而reset的地址是0xc0008040。CPU复位时，这个地址显然是无效的，而真正有效的地址是R(reset)，即0x8040。这正是代码\ref{code:4-2}中92行。由于相同的原因，117-118行也进行了类似的修改。
 
 \begin{code}
 \captionof{listing}{chapter04/kernel/entry.S}
 \label{code:4-2}
-\inputminted[firstline=79,lastline=108,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter04/kernel/entry.S}
+\inputminted[firstline=79,lastline=120,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter04/kernel/entry.S}
 \end{code}
 
 重新编译之后，用命令“arm-none-eabi-objdump -D kernel.elf”查看反汇编的代码，可以发现所有的地址都被加上了0xc0000000，如图\ref{figure:4-5}所示。
@@ -88,7 +88,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-3}
-\inputminted[firstline=137,lastline=149,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=145,lastline=157,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 \noindent
@@ -103,7 +103,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-4}
-\inputminted[firstline=151,lastline=162,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=159,lastline=170,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 接下来，为内核地址空间（3GiB～4GiB）分配二级页表。尽管理论上需要1024张二级页表，但是，实际上用不了那么多，因此目前只给它分配80（即NR\_KERN\_PAGETABLE）张。一张二级页表可以映射1MiB的地址空间，这意味着可以映射80MiB的逻辑地址空间，暂时已经足够用了。当然，我们要把二级页表的物理地址填充到一级页表中，而且所有的二级页表都要清零。此外，还要把新分配的二级页表以页面为单位(4张二级页表组成1个页面)，填充到ptpte中，保证将来用逻辑地址可以访问二级页表。注意，我们在填充一级页表的时候，把一级页表的第i项和(i+0xc00)项填充成相同的值(170行)，这意味着逻辑地址x和（0xc0000000+x）将被映射到相同的物理地址。二级页表项的标志位L2E\_V表示采用图\ref{figure:4-3}中的Small page格式，L2E\_W表示可以写，L2E\_C表示可以被缓存。
@@ -111,7 +111,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-5}
-\inputminted[firstline=164,lastline=176,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=172,lastline=185,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 这样，我们就准备好了一、二级页表，如图\ref{figure:4-6}所示。
@@ -129,7 +129,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-6}
-\inputminted[firstline=179,lastline=185,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=187,lastline=193,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 根据前面一级页表的填充方式，意味着0～R(\_end)和0xc0000000～\_end这两段逻辑地址都映射到了物理地址0～R(\_end)。其中，前者是恒等映射，它保证了分页开启后的一段时间内，可以继续访问逻辑地址0～R(\_end)。当内核完全运行在0xc0008000之后，就不需要恒等映射，届时将取消恒等映射。
@@ -140,7 +140,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-7}
-\inputminted[firstline=187,lastline=209,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=195,lastline=217,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 \noindent
@@ -165,7 +165,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-8}
-\inputminted[firstline=211,lastline=220,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=219,lastline=228,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 \noindent
@@ -248,13 +248,13 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/kernel.h}
 \label{code:4-16}
-\inputminted[firstline=40,lastline=50,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/kernel.h}
+\inputminted[firstline=38,lastline=48,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/kernel.h}
 \end{code}
 
 \begin{code}
 \captionof{listing}{chapter04/kernel/kernel.c}
 \label{code:4-17}
-\inputminted[firstline=25,lastline=26,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/kernel.c}
+\inputminted[firstline=13,lastline=14,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/kernel.c}
 \end{code}
 
 \section{缺页异常处理}\label{section:page-fault}
@@ -288,7 +288,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-20}
-\inputminted[firstline=321,lastline=327,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=329,lastline=335,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 因此，所有缺页异常的逻辑都是在do\_page\_fault中实现的。它首先根据状态码判断触发异常的原因。原因大体上可以分成三类：对齐(alignment)，转换(translation)，权限(permission)。目前，我们只处理了translation fault，即逻辑内存未映射到物理内存导致MMU不能完成地址转换，其他未处理的情况都返回失败。然后，用page\_prot判定触发异常的逻辑地址是否位于有效的逻辑内存块内，即该地址是否位于vmzone链表所记录的逻辑内存范围内。如果不是，表示访问了非法的逻辑内存，返回失败；否则，调用frame\_alloc分配一个物理内存页面。如果没有空闲的物理内存，也返回失败。接着，通过修改页表把触发异常的逻辑地址所在的页面映射到新分配的物理内存上，结束了一次异常处理的流程。
@@ -299,7 +299,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-21}
-\inputminted[firstline=248,lastline=319,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=256,lastline=327,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 \section{内存管理初始化}
@@ -320,7 +320,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-23}
-\inputminted[firstline=339,lastline=347,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=347,lastline=355,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 因为init\_paging在初始化页表的时候要消耗掉一部分物理内存，因此它返回了新的空闲物理内存的起始地址。
@@ -334,7 +334,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-24}
-\inputminted[firstline=349,lastline=352,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=357,lastline=360,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 这个函数的修饰符“\_\_attribute\_\_((naked))”告诉编译器不要为它生成出入口代码，函数内部只是把sp和lr寄存器加上KERNBASE，然后用“bx lr”指令返回。显然，函数返回之后sp和pc都被加上了KERNBASE，这就意味着之后的代码，已经以逻辑地址运行了。
@@ -342,7 +342,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-25}
-\inputminted[firstline=329,lastline=337,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=337,lastline=345,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 \subsection{物理及逻辑内存初始化}
@@ -357,16 +357,16 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-26}
-\inputminted[firstline=354,lastline=369,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=362,lastline=377,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 \subsection{映射外设地址}
-在第二、三章中，我们通过访问MMIO内存块[0x20000000, 0x21000000]控制外设。启用分页之后，这个逻辑内存块并未被映射到物理内存，不能再直接用它们控制外设了。为此，要把MMIO内存映射到逻辑地址空间中来，然后才能用逻辑地址去访问外设。把MMIO内存映射到哪个逻辑内存块呢？前面讲过，我们给内核分配了80张二级页表，能映射80MiB地址空间，即0xc0000000-0xc5000000。为了充分利用这80张页表，我们把MMIO内存映射到逻辑地址[0xc4000000, 0xc5000000]。选择了映射地址之后，通过page\_alloc\_in\_addr把这一块逻辑内存登记到地址空间vmzone中，然后调用函数page\_map完成映射关系。需要特别注意的是，在调用page\_map时，页表项标志位flags不能带L2E\_C，这是因为MMIO内存不能被缓存。
+在第二、三章中，我们通过访问MMIO内存块[0x20000000, 0x21000000]控制外设。启用分页之后，这个逻辑内存块并未被映射到物理内存，不能再直接用它们控制外设了。为此，要把MMIO内存映射到逻辑地址空间中来，然后才能用逻辑地址去访问外设。把MMIO内存映射到哪个逻辑内存块呢？前面讲过，我们给内核分配了80张二级页表，能映射80MiB地址空间，即0xc0000000～0xc5000000。为了充分利用这80张页表，我们把MMIO内存映射到逻辑地址[0xc4000000, 0xc5000000]。选择了映射地址之后，通过page\_alloc\_in\_addr把这一块逻辑内存登记到地址空间vmzone中，然后调用函数page\_map完成映射关系。需要特别注意的是，在调用page\_map时，页表项标志位flags不能带L2E\_C，这是因为MMIO内存不能被缓存。
 
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-27}
-\inputminted[firstline=371,lastline=376,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=379,lastline=384,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 除此之外，还得把源代码中的“MMIO\_BASE\_PA+XXX\_REG”的地方全部改为“MMIO\_BASE\_VA+XXX\_REG”，然后才能正常访问外设。
@@ -386,7 +386,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-28}
-\inputminted[firstline=378,lastline=396,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=386,lastline=404,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 \subsection{取消恒等映射}
@@ -395,7 +395,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-29}
-\inputminted[firstline=398,lastline=410,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=406,lastline=418,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 至此，物理内存和逻辑内存的布局如图\ref{figure:4-9}所示。
@@ -416,7 +416,7 @@ ARMv6支持多种页面大小，包括4KiB、64KiB、1MiB和16MiB，采用二级
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-30}
-\inputminted[firstline=438,lastline=447,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=448,lastline=457,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 结果如图\ref{figure:4-10}所示。其中，点“.”是定时器中断处理函数的输出。因为用户地址空间[0, 0xbfc00000)是空的，所以446行访问0地址时会触发无法处理的缺页异常。注意，中断或异常发生时，CPU会自动屏蔽中断(CPSR.I=1)，所以后面看不到定时器中断的输出。

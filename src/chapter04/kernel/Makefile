@@ -32,7 +32,7 @@ CFLAGS+=-Wall -O2 -ffreestanding -fleading-underscore
 #链接器的选项
 LDFLAGS+=-Tkernel.ld -nostdlib
 
-COBJS=machdep.o kernel.o printk.o bitmap.o frame.o page.o kmalloc.o
+COBJS=machdep.o kernel.o timer.o printk.o bitmap.o frame.o page.o kmalloc.o
 COBJS+=../lib/tlsf/tlsf.o ../lib/snprintf.o ../lib/string.o \
        ../lib/softfloat.o ../lib/memset.o ../lib/memcpy.o
 
