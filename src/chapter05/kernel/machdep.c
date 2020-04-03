@@ -473,7 +473,7 @@ void cstart(void)
     enable_irq(IRQ_TIMER);
 
     /*CPSR.I=0*/
-    sti();
+    //sti();
   }
 
   if(4-4) {

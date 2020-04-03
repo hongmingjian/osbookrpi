@@ -80,7 +80,10 @@
 可以看出，线程的切换，本质上就是不同线程之间栈的切换。
 
 \section{模式切换}
-在线程运行过程中，当中断或异常发生时， CPU可能会发生模式切换，比如从 user模式切换到 IRQ或 abort模式。此时， CPU会跳转到异常向量表中设置的地址去运行。在第三、四章中，通过 PUSH\-CONTEXT和  PULL\-CONTEXT来保存和恢复中断或异常的现场。在 PUSH\-CONTEXT中，无论哪种模式，都把现场保存到 supervisor模式栈，然后切换到 supervisor模式进行后续处理。这个 supervisor模式栈位于 (KERN\-BASE+0x1000-36)，以后称它为全局内核栈。因为它比较小(共 0x1000-36字节)，而中断或异常会嵌套触发，可能不够用。考虑到每个线程都有一个接近 4\-KiB 的内核栈(4\-KiB-sizeof(struct tcb))，所以要尽可能在线程的栈中去处理中断或者异常。这正是文件 kernel\-/\-entry.S中 PROLOGUE和 EPILOGUE所完成的工作。
+在线程运行过程中，当中断或异常发生时， CPU可能会发生模式切换，比如从 user模式切换到 IRQ或 abort模式。此时， CPU会跳转到异常向量表中设置的地址去运行。在第三、四章中，通过 PUSH\-CONTEXT和  PULL\-CONTEXT来保存和恢复中断或异常的现场。在 PUSH\-CONTEXT中，无论哪种模式，都把现场保存到 supervisor模式栈，然后切换到 supervisor模式进行后续处理。这个 supervisor模式栈位于 (KERN\-BASE+0x1000-36)，以后称它为全局内核栈。
+
+\par
+内核支持多线程后，不能把所有线程的中断或异常现场都保存在全局栈上。一方面，全局栈的空间比较小，可能导致空间不足；另一方面，也无法区分栈上的现场各自属于哪个线程。考虑到每个线程都有一个接近 4\-KiB 的内核栈(4\-KiB-sizeof(struct tcb))，可以把中断或异常现场放在当前线程的栈上。换句话说，以当前线程的身份去处理中断或者异常，以避免前述的问题。这正是文件 kernel\-/\-entry.S中 PROLOGUE和 EPILOGUE所完成的工作。
 
 \par
 先来看 PROLOGUE。中断或异常发生时， PUSH\-CONTEXT已经让 CPU运行在 supervisor模式，把现场保存在全局栈中，而且正在这个栈上运行。下面把现场搬到  g\_\-task\_\-running的内核栈。代码\ref{code:5-7}中 77～ 80行判断指针   g\_\-task\_\-running是否有效。如果是无效指针，则表示多线程系统还没有初始化，无法切换到线程的内核栈，仍然在当前栈继续。 82～ 85行判断是否发生了模式切换，如果中断或异常之前已经运行在 supervisor模式，说明已经运行在当前线程的内核栈，没有必要搬运。如果  g\_\-task\_\-running是有效指针，而且从 user模式进来，才需要把现场从当前栈(即全局栈)搬到线程自己的内核栈上，这正是 87～ 95行完成的工作。
@@ -161,7 +164,10 @@
 \end{code}
 
 \noindent
-79～80行相当于“r0=task0-\textgreater kstack”。 81～ 82行把标号1(85行)的地址填入( task0-\textgreater kstack+76)。因为 INIT\_\-TASK\_\-CONTEXT在线程的内核栈上压入了19个数(结构体 context和 \&ret\_\-from\_\-svc，共76字节)，所以(task0-\textgreater kstack+76)指向内核栈上 context结构体的pc字段。也就是说， task0启动后会从标号1的位置开始往下执行。因此，根据代码\ref{code:5-12}， task0启动后会执行503行的空循环。 83～ 84行用于启动 task0：首先把栈切换到 task0的内核栈，然后跳转到 ret\_\-from\_\-svc启动 task0，详细启动流程请参考\ref{section:start-thread}节。
+79～80行相当于“r0=task0-\textgreater kstack”。 81～ 82行把标号1(85行)的地址填入( task0-\textgreater kstack+76)。因为 INIT\_\-TASK\_\-CONTEXT在线程的内核栈上压入了19个数(结构体 context和 \&ret\_\-from\_\-svc，共76字节)，所以(task0-\textgreater kstack+76)指向内核栈上 context结构体的pc字段。也就是说， task0启动后会从标号1的位置开始往下执行。 83～ 84行用于启动 task0：首先把栈切换到 task0的内核栈，然后跳转到 ret\_\-from\_\-svc启动 task0，详细启动流程请参考\ref{section:start-thread}节。
+
+\par
+初始化完成之后， run\_\-as\_\-task0()之后的代码，都会以task0的身份执行。
 
 \section{线程退出与等待}
 前面几节讲解了线程的创建、调度和启动等功能。除此之外，内核还要提供一些必备的功能，比如线程退出、等待等。
@@ -205,13 +211,16 @@
 \section{测试}
 为了验证多线程系统，来做一个简单的测试，如代码\ref{code:5-18}所示。因为系统还不能进入user模式运行，暂时只能测试内核级线程。
 
+\par
+在第三章做中断测试时，需要调用函数 sti()手工打开CPU中断，见代码\ref{code:3-20}中172行。在 run\_\-as\_\-task0启动 task0过程中，根据INIT\_\-TASK\_\-CONTEXT设置的spsr(见代码\ref{code:5-10}中72行)， ret\_\-from\_\-svc用PULL\-CONTEXT恢复task0的现场时会自动打开中断，不再需要手工打开中断了。
+
 \begin{code}
 \captionof{listing}{chapter05/kernel/machdep.c}
 \label{code:5-18}
-\inputminted[firstline=504,lastline=537,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/machdep.c}
+\inputminted[firstline=501,lastline=537,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/machdep.c}
 \end{code}
 
-首先创建两个线程，分别输出字符“A”和“B”各 1000次，然后 task0等待线程 A、 B退出后打印消息，结果如图\ref{figure:5-2}所示。其中，“.”仍然是定时器中断处理函数的输出。可以看出，线程A运行了4次定时器中断后，内核调度了线程B运行，B也运行了4次，如此反复直至结束。这是因为创建线程时给默认分配了4个时间片，即4次定时器中断，如代码\ref{code:5-1}和\ref{code:5-2}所示。
+首先，task0(run\_\-as\_\-task0()之后的代码都以 task0的身份运行)创建两个线程，分别输出字符“A”和“B”各 1000次，然后等待线程 A、 B退出后打印消息，结果如图\ref{figure:5-2}所示。其中，“.”仍然是定时器中断处理函数的输出。可以看出，线程A运行了4次定时器中断后，内核调度了线程B运行，B也运行了4次，如此反复直至结束。这是因为创建线程时给默认分配了4个时间片，即4次定时器中断，如代码\ref{code:5-1}和\ref{code:5-2}所示。
 
 \begin{figure}[htp]
 \centering
