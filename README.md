@@ -6,5 +6,5 @@
 
 2016年的时候，一开始就在Word里面写。写到后面，需要大量引用源代码，效率非常低下，但也不想中途换工具，硬着头皮往下写。为了提高效率，这次把原来Word的内容移植到LaTeX里面来，大大提高了写作效率。
 
-# Writing an operating system for Raspberry Pi
+# Writing a toy operating system for bare metal Raspberry Pi
 It was 2016 when I tried to write this book. After finishing 4 chapters, I stopped writing because of other business.
