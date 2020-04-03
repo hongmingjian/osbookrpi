@@ -144,16 +144,16 @@ static void init_pit(uint32_t freq)
 __attribute__((noreturn))
 void cstart(void)
 {
-  {
+  if(2) {
     char *s="Hello, world!\r\n";
 
-    init_uart(9600);
+    init_uart(115200);
 
     while(*s)
       sys_putchar(*s++);
   }
 
- {
+  if(3) {
     int i;
 
     /*初始化中断控制器和定时器*/

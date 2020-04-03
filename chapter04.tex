@@ -4,7 +4,7 @@
 \ifxetex\else\begin{CJK*}{UTF8}{song}\fi
 
 \chapter{内存管理(上)}
-内存管理是操作系统的基本功能之一。在主流的操作系统中，一般都通过分页实现虚拟内存，给每个进程分配了一个巨大、连续、私有的虚拟内存，极大地简化了进程的内存管理。不仅如此，分页还允许进程之间共享内存，提高了物理内存的利用率。在 32位操作系统中， 4GiB的地址空间一般采用3\-:\-1布局，即 0～ 3\-GiB给用户代码，3～ 4\-GiB留给内核。
+内存管理是操作系统的基本功能之一。在主流的操作系统中，一般都通过分页实现虚拟内存，给每个进程分配了一个巨大、连续、私有的虚拟内存，极大地简化了进程的内存管理。不仅如此，分页还允许进程之间共享内存，提高了物理内存的利用率。在 32位操作系统中， 4\-GiB的地址空间一般采用3:1布局，即 0～ 3\-GiB给用户代码，3～ 4\-GiB留给内核。
 
 \par
 本章讲解如何在 ARM上面实现基于分页的虚拟内存。
@@ -77,7 +77,7 @@
 \label{figure:4-5}
 \end{figure}
 
-严格来说， kernel.img只有被加载地址 0xc000\-8000才能运行。然而，它被加载到 0x8000的位置，也可以运行。其原因在于编译器在产生代码的时候，会用相对地址。例如，图\ref{figure:4-5}中 \_entry处的几条指令，都是“ldr pc, [pc, \#24]”，这个指令的意思是：把 (PC+24)处4个字节的数据赋值给PC。因为树莓派的 CPU在复位时 PC=0x8000，这条指令会把 0x8020处(为什么不是 0x8018？因为在 ARM中 PC等于下一条指令的地址加8)的4字节数据赋值给PC，即 PC = 0x8040。因此，这样的 kernel.img即使被加载到 0x8000也是可以运行的，因为通过相对地址避免了引用 0xc000\-8020这样的绝对地址。
+严格来说， kernel.img只有被加载地址 0xc000\-8000才能运行。然而，它被加载到 0x8000的位置，也可以运行。其原因在于编译器在产生代码的时候，会用相对地址。例如，图\ref{figure:4-5}中 \_entry处的几条指令，都是“ldr pc, [pc, \#24]”，这个指令的意思是：把 (PC+24)处4个字节的数据赋值给PC。因为树莓派的 CPU在复位时 PC=0x8000，这条指令会把 0x8020处(为什么不是 0x8018？因为在 ARM中 PC等于下一条指令的地址加8)的4字节数据赋值给PC，即 PC=0x8040。因此，这样的 kernel.img即使被加载到 0x8000也是可以运行的，因为通过相对地址避免了引用 0xc000\-8020这样的绝对地址。
 
 \par
 但是，不是所有的操作都可以用相对地址，例如访问全局变量一般会用到绝对地址。因为链接地址从 0xc000\-8000开始，这些位置显然没有任何内存，如果运行过程中引用了全局变量，就会导致程序出错。下面，我们通过初始化页表，让内核运行在被链接的逻辑地址之上。也就是说，我们要把内核从加载地址 0x8000重定位到逻辑地址 0xc000\-8000。注意，在初始化过程中，不能引用全局变量。
@@ -240,7 +240,7 @@
 \end{code}
 
 \noindent
-因为修改了页表项中的地址映射，我们用函数 invlpg(\-va\-)清空TLB缓存中逻辑地址 va的缓存项。
+因为修改了页表项中的地址映射，我们用函数 invlpg(va)清空TLB缓存中逻辑地址 va的缓存项。
 
 \par
 这里着重说明一下 vtopte(va)。它其实是个宏定义，计算给定逻辑地址 va所对应的二级页表项的指针。把代码\ref{code:4-16}和\ref{code:4-17}放在一起看，才能更好地理解 vtopte。其中， PGDR\_\-SHIFT=20， PAGE\_\-SHIFT=12，全局变量 PTD指向了一级页表的起始地址，即 0xc000\-4000；而PT指向了二级页表的起始地址，即 0xbfc0\-0000，如图\ref{figure:4-7}所示。
@@ -272,7 +272,7 @@
 \inputminted[firstline=91,lastline=106,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter04/kernel/entry.S}
 \end{code}
 
-在处理这两个异常时，仍然使用 PUSH\-CONTEXT和 PULL\-CONTEXT两个宏定义，因为这部分的处理方法与中断是完全相同的。需要特别注意的是， IRQ和 pre\-fetch abort时lr\_\-irq和lr\_\-abt等于 (PC + 4)，而 data abort时 lr\_\-abt等于 (PC+8)，因此在 PUSH\-CONTEXT之前，先要把 lr减掉4才能进行后续的统一处理。
+在处理这两个异常时，仍然使用 PUSH\-CONTEXT和 PULL\-CONTEXT两个宏定义，因为这部分的处理方法与中断是完全相同的。需要特别注意的是， IRQ和 pre\-fetch abort时lr\_\-irq和lr\_\-abt等于 (PC+4)，而 data abort时 lr\_\-abt等于 (PC+8)，因此在 PUSH\-CONTEXT之前，先要把 lr减掉4才能进行后续的统一处理。
 
 \par
 接着，把缺页异常发生时的 CPU现场 (struct context)、以及触发该异常的逻辑地址 (Fault Address， FA)和状态码 (Fault Status， FS)作为参数传递给统一的C语言处理函数 abort\_\-handler。
@@ -372,7 +372,7 @@
 除此之外，还得把源代码中的“MMIO\_\-BASE\_\-PA+XXX\_\-REG”的地方全部改为“MMIO\_\-BASE\_\-VA+XXX\_\-REG”，然后才能正常访问外设。
 
 \subsection{开启 HiVecs功能}
-在 ARM早期的版本中，异常向量的基地址只能是0，即复位时 PC=0、 IRQ时 PC=0x18等等，如图\ref{figure:4-8}所示。所以，内核必须保留逻辑地址空间的第一个页面 [0, 0x1000]用于放置异常向量。在 ARM\-720T之后，支持所谓的 HiVecs，即异常向量的基地址可以是 0xffff\-0000。开启 HiVecs后，复位时 PC=0xffff\-0000、 IRQ时 PC=0xffff\-0018等等，见图\ref{figure:4-8}。
+在 ARM早期的版本中，异常向量的基地址只能是0，即复位时 PC=0、 IRQ时 PC=0x18等等，如图\ref{figure:4-8}所示。所以，内核必须保留逻辑地址空间的第一个页面 [0, 0x1000]用于放置异常向量。在 ARM\-720T之后，支持所谓的 Hi\-Vecs，即异常向量的基地址可以是 0xffff\-0000。开启 Hi\-Vecs后，复位时 PC=0xffff\-0000、 IRQ时 PC=0xffff\-0018等等，见图\ref{figure:4-8}。
 
 \begin{figure}[htp]
 \centering
@@ -381,7 +381,7 @@
 \label{figure:4-8}
 \end{figure}
 
-因此，我们先把 [0xffff\-0000, 0xffff\-1000]这一个页面用 page\_\-alloc\_\-in\_\-addr预留下来，然后用 page\_\-map把它映射到物理地址 0x8000(因为异常向量表位于 kernel.img的开始位置，而 kernel.img被加载到物理地址 0x8000)。这样就把异常向量挪到了逻辑地址 0xffff\-0000上，然后通过修改系统控制寄存器 SCTLR开启 HiVecs模式。
+因此，我们先把 [0xffff\-0000, 0xffff\-1000]这一个页面用 page\_\-alloc\_\-in\_\-addr预留下来，然后用 page\_\-map把它映射到物理地址 0x8000(因为异常向量表位于 kernel.img的开始位置，而 kernel.img被加载到物理地址 0x8000)。这样就把异常向量挪到了逻辑地址 0xffff\-0000上，然后通过修改系统控制寄存器 SCTLR开启 Hi\-Vecs模式。
 
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
@@ -390,7 +390,7 @@
 \end{code}
 
 \subsection{取消恒等映射}
-经过前面的初始化步骤，内核已经运行于设定的链接地址，而且中断和缺页异常发生时，会直接跳转到 Hivecs，不再需要恒等映射。取消恒等映射很简单，只要把一级页表的前 80 (= NR\_\-KERN\_\-PAGE\-TABLE)项全部清零即可，代码\ref{code:4-29}中的全局变量 PTD是指向一级页表的指针。然后，清空整个 TLB缓存，以使修改立即生效。
+经过前面的初始化步骤，内核已经运行于设定的链接地址，而且中断和缺页异常发生时，会直接跳转到 Hi\-Vecs，不再需要恒等映射。取消恒等映射很简单，只要把一级页表的前 80 (= NR\_\-KERN\_\-PAGE\-TABLE)项全部清零即可，代码\ref{code:4-29}中的全局变量 PTD是指向一级页表的指针。然后，清空整个 TLB缓存，以使修改立即生效。
 
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
@@ -416,7 +416,7 @@
 \begin{code}
 \captionof{listing}{chapter04/kernel/machdep.c}
 \label{code:4-30}
-\inputminted[firstline=448,lastline=457,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
+\inputminted[firstline=448,lastline=458,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter04/kernel/machdep.c}
 \end{code}
 
 结果如图\ref{figure:4-10}所示。其中，点“.”是定时器中断处理函数的输出。因为用户地址空间 [0, 0xbfc0\-0000)是空的，所以 446行访问0地址时会触发无法处理的缺页异常。注意，中断或异常发生时， CPU会自动屏蔽中断 (CPSR.I=1)，所以后面看不到定时器中断的输出。

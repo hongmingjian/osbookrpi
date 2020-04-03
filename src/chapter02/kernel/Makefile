@@ -30,7 +30,7 @@ ASFLAGS=-Wall -O2
 CFLAGS+=-Wall -O2 -ffreestanding -fleading-underscore
 
 #链接器的选项
-LDFLAGS+=-Tkernel.ld -nostdlib
+LDFLAGS+=-T$(PROG).ld -nostdlib
 
 COBJS=machdep.o
 
@@ -42,11 +42,14 @@ all: $(PROG).img
 $(PROG).img: $(PROG).elf
 	$(OBJCOPY) $^ -O binary $@
 
-$(PROG).elf: kernel.ld $(OBJS)
+$(PROG).elf: $(PROG).ld $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@
 
-kernel.ld: kernel.ld.in
+$(PROG).ld: $(PROG).ld.in
 	$(CC) -E -P -x c-header -o $@ $^
 
+$(PROG).uue: $(PROG).img
+	uuencode $^ $^ >$@
+
 clean:
-	-$(RM) $(OBJS) $(PROG).{ld,img,elf}
+	-$(RM) $(OBJS) $(PROG).{ld,img,elf,map,uue}

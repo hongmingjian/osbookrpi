@@ -347,7 +347,7 @@ static void trampoline()
 __attribute__((noreturn))
 void cstart(void)
 {
-  {
+  if(4) {
     int i;
     uint32_t virtfree,
              _end = (uint32_t)(&end),
@@ -417,16 +417,16 @@ void cstart(void)
                          : [data] "r" (0));
   }
 
-  {
+  if(2) {
     char *s="Hello, world!\r\n";
 
-    init_uart(9600);
+    init_uart(115200);
 
     while(*s)
       sys_putchar(*s++);
   }
 
- {
+  if(3) {
     int i;
 
     /*初始化中断控制器和定时器*/
@@ -445,11 +445,12 @@ void cstart(void)
     sti();
   }
 
-  if(1) {
+  if(4) {
 	int *p = (int *)kmalloc(sizeof(int));
 	printk("kmalloc(sizeof(int)) returns 0x%08x\r\n", p);
 	*p = 0x5a5a5a5a;
 	printk("Its value reads 0x%08x\r\n", *p);
+	kfree(p);
 
     /*将会触发无法处理的缺页异常*/
     p = (int *)0;
