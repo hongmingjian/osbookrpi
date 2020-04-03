@@ -10,22 +10,19 @@
 
 void sys_putchar ( int c );
 
-int printk(const char *fmt,...);
-////////////////////////////////////////////////
-
-/*ÖĞ¶ÏÏòÁ¿±í*/
+/*ä¸­æ–­å‘é‡è¡¨*/
 extern void (*g_intr_vector[])(uint32_t irq, struct context *ctx);
 
-/*ÈÃÖĞ¶Ï¿ØÖÆÆ÷´ò¿ªÄ³¸öÖĞ¶Ï*/
-void disable_irq(uint32_t irq);
-
-/*ÈÃÖĞ¶Ï¿ØÖÆÆ÷¹Ø±ÕÄ³¸öÖĞ¶Ï*/
+/*è®©ä¸­æ–­æ§åˆ¶å™¨æ‰“å¼€æŸä¸ªä¸­æ–­*/
 void enable_irq(uint32_t irq);
 
-/*¶¨Ê±Æ÷ÒÔHZµÄÆµÂÊÖĞ¶ÏCPU*/
+/*è®©ä¸­æ–­æ§åˆ¶å™¨å…³é—­æŸä¸ªä¸­æ–­*/
+void disable_irq(uint32_t irq);
+
+/*å®šæ—¶å™¨ä»¥HZçš„é¢‘ç‡ä¸­æ–­CPU*/
 #define HZ   100
 
-/*¼ÇÂ¼ÏµÍ³Æô¶¯ÒÔÀ´£¬¶¨Ê±Æ÷ÖĞ¶ÏµÄ´ÎÊı*/
+/*è®°å½•å®šæ—¶å™¨ä¸­æ–­çš„æ¬¡æ•°*/
 extern unsigned volatile g_timer_ticks;
 
 void isr_default(uint32_t irq, struct context *ctx);
@@ -33,16 +30,23 @@ void isr_timer(uint32_t irq, struct context *ctx);
 
 void sti(), cli();
 
-////////////////////////////////////////////////////////
+int printk(const char *fmt,...);
+
 #define RAM_ZONE_LEN (2 * 8)
 extern uint32_t g_ram_zone[RAM_ZONE_LEN];
 
-#define VADDR(pdi, pti) ((uint32_t)(((pdi)<<PGDR_SHIFT)|((pti)<<PAGE_SHIFT)))
+#define VADDR(pdi, pti) ((uint32_t)(((pdi)<<PGDR_SHIFT)|\
+                                    ((pti)<<PAGE_SHIFT)))
 
 #define KERN_MAX_ADDR VADDR(0xFFF, 0xFF)
 #define KERN_MIN_ADDR VADDR(0xC00, 0x04)
 #define USER_MAX_ADDR VADDR(0xBFC, 0x00)
 #define USER_MIN_ADDR VADDR(4, 0)
+
+extern uint32_t *PTD;
+extern uint32_t *PT;
+#define vtopte(va) (PT+((va)>>PAGE_SHIFT))
+#define vtop(va) (((*vtopte(va))&(~PAGE_MASK))|((va)&PAGE_MASK))
 
 #define KERNBASE  VADDR(0xC00, 0)
 #define R(x) ((x)-KERNBASE)
@@ -55,12 +59,8 @@ extern uint32_t g_ram_zone[RAM_ZONE_LEN];
         (uint32_t)(va) + (len) <= USER_MAX_ADDR)
 
 extern uint8_t   end;
-extern uint32_t *PT;
-extern uint32_t *PTD;
-#define vtopte(va) (PT+((va)>>PAGE_SHIFT))
-#define vtop(va) (((*vtopte(va))&(~PAGE_MASK))|((va)&PAGE_MASK))
 
-void     init_vmspace(uint32_t brk);
+void     init_vmspace(uint32_t virtfree);
 uint32_t page_alloc(int npages, uint32_t prot, uint32_t user);
 uint32_t page_alloc_in_addr(uint32_t va, int npages, uint32_t prot);
 int      page_free(uint32_t va, int npages);
@@ -75,7 +75,7 @@ uint32_t page_prot(uint32_t va);
 void     page_map(uint32_t vaddr, uint32_t paddr, uint32_t npages, uint32_t flags);
 void     page_unmap(uint32_t vaddr, uint32_t npages);
 
-uint32_t init_frame(uint32_t brk);
+uint32_t init_frame(uint32_t virtfree);
 uint32_t frame_alloc(uint32_t npages);
 uint32_t frame_alloc_in_addr(uint32_t pa, uint32_t npages);
 void     frame_free(uint32_t paddr, uint32_t npages);
@@ -84,6 +84,47 @@ void  init_kmalloc(void *mem, size_t bytes);
 void *kmalloc(size_t bytes);
 void *krealloc(void *oldptr, size_t size);
 void  kfree(void *ptr);
-void *aligned_kmalloc(size_t bytes, size_t align);
-void  aligned_kfree(void *ptr);
+void *kmemalign(size_t align, size_t bytes);
+
+struct tcb {
+    uint32_t    kstack;         //å†…æ ¸æ ˆï¼Œå¿…é¡»æ˜¯ç¬¬ä¸€ä¸ªå­—æ®µ
+
+    int         tid;            //çº¿ç¨‹ID
+    int         state;          //çº¿ç¨‹çŠ¶æ€
+#define TASK_STATE_WAITING  -1  //ç­‰å¾…
+#define TASK_STATE_READY     1  //å°±ç»ª
+#define TASK_STATE_ZOMBIE    2  //åƒµå°¸
+
+    int         timeslice;      //æ—¶é—´ç‰‡
+#define TASK_TIMESLICE_DEFAULT 4
+
+    int         code_exit;      //çº¿ç¨‹çš„é€€å‡ºä»£ç 
+    struct wait_queue *wq_exit; //ç­‰å¾…è¯¥çº¿ç¨‹é€€å‡ºçš„çº¿ç¨‹é˜Ÿåˆ—
+
+    struct tcb  *next;
+
+    uint32_t     signature;     //å¿…é¡»æ˜¯æœ€åä¸€ä¸ªå­—æ®µ
+#define TASK_SIGNATURE 0x20160201
+};
+
+#define TASK_KSTACK 0           //=offsetof(struct tcb, kstack)
+
+extern struct tcb *g_task_running;
+extern struct tcb *g_task_head;
+extern struct tcb *task0;
+
+extern int g_resched;
+void schedule();
+void switch_to(struct tcb *new);
+
+struct wait_queue {
+    struct tcb *tsk;
+    struct wait_queue *next;
+};
+void sleep_on(struct wait_queue **head);
+void wake_up(struct wait_queue **head, int n);
+
+void init_task(void);
+void syscall(struct context *ctx);
+extern void *ret_from_svc;
 #endif /*_KERNEL_H*/

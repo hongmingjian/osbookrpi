@@ -3,11 +3,13 @@
 
 #include "arch.h"
 
-#define MMIO_BASE_PA 0x20000000
+#define MMIO_BASE_PA   0x20000000
+#define SYS_CLOCK_FREQ 250000000UL
+#define LOADADDR       0x8000
 
 #define AUX_REG (0x215000)
 typedef struct {
-	volatile unsigned int IRQ;
+	volatile unsigned int irq;
 	volatile unsigned int enables;
 	volatile unsigned int UNUSED1[14];
 	volatile unsigned int mu_io;
@@ -83,9 +85,9 @@ typedef struct {
 
 #define ARMTIMER_REG (0xB400)
 typedef struct {
-	volatile unsigned int Load;
-	volatile unsigned int Value;
-	volatile unsigned int Control;
+	volatile unsigned int load;
+	volatile unsigned int value;
+	volatile unsigned int control;
 #define ARMTIMER_CTRL_23BIT            (1 << 1)
 #define ARMTIMER_CTRL_PRESCALE_1       (0 << 2)
 #define ARMTIMER_CTRL_PRESCALE_16      (1 << 2)
@@ -93,26 +95,26 @@ typedef struct {
 #define ARMTIMER_CTRL_INTR_ENABLE      (1 << 5)
 #define ARMTIMER_CTRL_ENABLE           (1 << 7)
 
-	volatile unsigned int IRQClear;
-	volatile unsigned int RAWIRQ;
-	volatile unsigned int MaskedIRQ;
-	volatile unsigned int Reload;
-	volatile unsigned int PreDivider;
-	volatile unsigned int FreeRunningCounter;
+	volatile unsigned int irqclear;
+	volatile unsigned int rawirq;
+	volatile unsigned int maskedirq;
+	volatile unsigned int reload;
+	volatile unsigned int predivider;
+	volatile unsigned int freerunningcounter;
 } armtimer_reg_t;
 
 #define INTR_REG (0xB200)
 typedef struct {
-	volatile unsigned int IRQ_basic_pending;
-	volatile unsigned int IRQ_pending_1;
-	volatile unsigned int IRQ_pending_2;
-	volatile unsigned int FIQ_control;
-	volatile unsigned int Enable_IRQs_1;
-	volatile unsigned int Enable_IRQs_2;
-	volatile unsigned int Enable_basic_IRQs;
-	volatile unsigned int Disable_IRQs_1;
-	volatile unsigned int Disable_IRQs_2;
-	volatile unsigned int Disable_basic_IRQs;
+	volatile unsigned int irq_basic_pending;
+	volatile unsigned int irq_pending_1;
+	volatile unsigned int irq_pending_2;
+	volatile unsigned int fiq_control;
+	volatile unsigned int enable_irqs_1;
+	volatile unsigned int enable_irqs_2;
+	volatile unsigned int enable_basic_irqs;
+	volatile unsigned int disable_irqs_1;
+	volatile unsigned int disable_irqs_2;
+	volatile unsigned int disable_basic_irqs;
 } intr_reg_t;
 
 #define IRQ_TIMER     0

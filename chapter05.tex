@@ -1,0 +1,228 @@
+\documentclass[main.tex]{subfiles}
+\ifxetex\else\onlyinsubfile{\usepackage{CJKutf8}}\fi
+\begin{document}
+\ifxetex\else\begin{CJK*}{UTF8}{song}\fi
+
+\chapter{多线程管理}
+在内核层面支持多线程是大部分现代操作系统必备的功能之一。尽管我们的操作系统只是个玩具，但也要实现这个很酷的功能。但是，我们的系统暂时只能利用一个 CPU或 CPU的一个核心。
+
+\section{线程描述}
+线程是对 CPU的虚拟化，每个线程对应一个可执行的实体。内核用一个数据结构 tcb去描述线程，如代码\ref{code:5-1}所示。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/kernel.h}
+\label{code:5-1}
+\inputminted[firstline=89,lastline=108,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/kernel.h}
+\end{code}
+
+大部分字段可以从字面或者注释中得到解释，不再重复。其中， kstack是线程内核栈的地址。系统中的每个线程，一般来说有两个栈，即用户栈和内核栈。它们分别用于保存在 user模式和 supervisor模式中执行时的局部变量、函数参数等临时数据。显然，如果一个线程只在内核中运行，就不需要用户栈，一般称这种线程为内核级线程。当某个线程因为某种原因不能运行时， kstack记录了它内核栈的位置。
+
+\par
+状态中的僵尸状态表示线程已经结束运行，但是它的资源还没有被内核回收，比如它的 tcb。最后一个字段 signature(即签名)用于保护这个结构体，参考\ref{section:create-thread}节。
+
+\section{线程创建}
+\label{section:create-thread}
+创建线程是由函数 sys\_\-task\_\-create完成的，如代码\ref{code:5-2}所示。创建一个线程的时候，内核给它分配一个页面大小的内存，即 4KiB。页面的前面部分用来存储结构体 tcb，剩下部分作为线程的内核栈，如图\ref{figure:5-1}所示。栈是从高地址往低地址增长，如果内核栈溢出了，会破坏 signature字段。因此，通过判断 signature字段是否被修改就知道内核栈是否溢出了。196行的宏 INIT\_\-TASK\_\-CONTEXT将在\ref{section:start-thread}节中解释。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.4]{figures/5-1}
+\caption{线程结构}
+\label{figure:5-1}
+\end{figure}
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/task.c}
+\label{code:5-2}
+\inputminted[firstline=162,lastline=202,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/task.c}
+\end{code}
+
+\section{线程调度}
+现代操作系统，一般采用分时来保证系统的响应，即操作系统给每个线程分配一个时间片让它运行。时间片用完了，操作系统就会调度其它线程运行，并重置时间片。显然，这个过程涉及到计时操作，因此把它放在定时器中断中去完成，如代码\ref{code:5-3}中 16～ 30行所示。全局变量 g\_\-resched告诉操作系统什么时候要重新调度一个线程运行。
+
+\par
+特别要注意线程 task0(它的tid=0)，它是系统空闲线程 (system idle)，即当整个系统中所有其他线程都不能运行时，才能调度 task0运行。所以，只要是 task0在运行，操作系统必须重新调度。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/timer.c}
+\label{code:5-3}
+\inputminted[firstline=8,lastline=31,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/timer.c}
+\end{code}
+
+而真正的调度工作，是在函数 schedule中完成的，如代码\ref{code:5-4}所示。其中， 34～ 50行实现了轮转调度算法。 55～ 57行通过 tcb中的 signature检查内核栈是否溢出了，然后调用函数 switch\_\-to切换到线程 select执行。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/task.c}
+\label{code:5-4}
+\inputminted[firstline=29,lastline=61,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/task.c}
+\end{code}
+
+\section{线程切换}
+函数 switch\_\-to实现了线程切换，代码不多，但需要解释一下。以 162行为界，它被分成两部分：前半部分保存正在运行线程的状态，后半部分恢复即将运行线程 new的状态到 CPU上。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/machdep.c}
+\label{code:5-5}
+\inputminted[firstline=145,lastline=162,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/machdep.c}
+\end{code}
+
+前半部分的151行把 r0～ r12和 r14压到当前线程的内核栈上， 152～ 153行把标号1(即 168行)的地址也压到栈上， 154～ 155行相当于“ g\_\-task\_\-running-\textgreater kstack=sp”，即把当前栈的位置保存到 tcb的 kstack字段。至此， g\_\-task\_\-running的状态被冻结在它的内核栈上。此时，在当前栈上总共保存了 15*4=60字节， 156行把 sp重置为 151行之前的位置，以保证后面的代码能正常运行。 162行更新 g\_\-task\_\-running指针。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/machdep.c}
+\label{code:5-6}
+\inputminted[firstline=162,lastline=174,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/machdep.c}
+\end{code}
+
+后半部分的 165～ 166行相当于“sp=g\_\-task\_\-running-\textgreater kstack”，即把当前栈切换到线程 new的内核栈， 167行把栈顶元素弹出给 pc。在此之前，线程 new的状态也被 151～ 155行冻结在它的内核栈上，而且栈顶的元素是标号1(即 168行)的地址，所以 167行相当于让 CPU跳到 169行运行。此时栈上的数据正好是由 151行保存的，因此接下来的 169行只是恢复这些寄存器。由于当前栈已经切换到了线程 new的内核栈，所以线程 new在运行了。
+
+\par
+可以看出，线程的切换，本质上就是不同线程之间栈的切换。
+
+\section{模式切换}
+在线程运行过程中，当中断或异常发生时， CPU可能会发生模式切换，比如从 user模式切换到 IRQ或 abort模式。此时， CPU会跳转到异常向量表中设置的地址去运行。在第三、四章中，通过 PUSH\-CONTEXT和  PULL\-CONTEXT来保存和恢复中断或异常的现场。在 PUSH\-CONTEXT中，无论哪种模式，都把现场保存到 supervisor模式栈，然后切换到 supervisor模式进行后续处理。这个 supervisor模式栈位于 (KERN\-BASE+0x1000-36)，以后称它为全局内核栈。因为它比较小(共 0x1000-36字节)，而中断或异常会嵌套触发，可能不够用。考虑到每个线程都有一个接近 4\-KiB 的内核栈(4\-KiB-sizeof(struct tcb))，所以要尽可能在线程的栈中去处理中断或者异常。这正是文件 kernel\-/\-entry.S中 PROLOGUE和 EPILOGUE所完成的工作。
+
+\par
+先来看 PROLOGUE。中断或异常发生时， PUSH\-CONTEXT已经让 CPU运行在 supervisor模式，把现场保存在全局栈中，而且正在这个栈上运行。下面把现场搬到  g\_\-task\_\-running的内核栈。代码\ref{code:5-7}中 77～ 80行判断指针   g\_\-task\_\-running是否有效。如果是无效指针，则表示多线程系统还没有初始化，无法切换到线程的内核栈，仍然在当前栈继续。 82～ 85行判断是否发生了模式切换，如果中断或异常之前已经运行在 supervisor模式，说明已经运行在当前线程的内核栈，没有必要搬运。如果  g\_\-task\_\-running是有效指针，而且从 user模式进来，才需要把现场从当前栈(即全局栈)搬到线程自己的内核栈上，这正是 87～ 95行完成的工作。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/entry.S}
+\label{code:5-7}
+\inputminted[firstline=76,lastline=97,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter05/kernel/entry.S}
+\end{code}
+
+\par
+再来看 EPILOGUE，它做与 PROLOGUE相反的工作，即把现场从当前线程的内核栈搬到全局栈，然后在全局栈中统一用 PULL\-CONTEXT恢复并返回。 EPILOGUE要判断是否将返回到 user模式，因为只有发生模式切换时才需要进行搬运。特别注意的是，返回到 user模式运行后，线程的内核栈被清空(也应该是空的)，而且全局栈也回到了初始的位置，即 (KERN\-BASE+0x1000-36)。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/entry.S}
+\label{code:5-8}
+\inputminted[firstline=99,lastline=122,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter05/kernel/entry.S}
+\end{code}
+
+\par
+可以看出，全局栈起着临时过渡的作用。多线程系统初始化完成后，内核所有的活动都是在当前线程的内核栈中完成的，包括中断和异常处理。
+
+\par
+接着，我们要修改第三、四章中的 IRQ和 abort处理流程，在 PUSH\-CONTEXT之后、  PULL\-CONTEXT之前分别加入对 PROLOGUE和 EPILOGUE的调用即可，如代码\ref{code:5-9}所示。其中， 213～ 214行的作用，将在\ref{section:start-thread}节中解释。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/entry.S}
+\label{code:5-9}
+\inputminted[firstline=201,lastline=243,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter05/kernel/entry.S}
+\end{code}
+
+\section{启动线程}
+\label{section:start-thread}
+每个线程被创建之后，都会被操作系统调度执行。问题是，线程要从哪里开始执行呢？一般来说，不会是线程函数。因为运行在 supervisor模式的内核没有办法直接运行一个 user模式下面的函数，这中间涉及到模式切换的问题。
+
+\par
+通常的做法是假装新创建的线程刚才被中断了，然后操作系统调度它运行的时候，通过恢复中断现场来启动线程运行。我们知道，当线程被中断的时候，现场由 PUSH\-CONTEXT和 PROLOGUE保存在它的内核栈上。因此，只要在新创建线程的内核栈上模拟一个中断之前的场景即可。这正是代码\ref{code:5-2}中195行的宏 INIT\_\-TASK\_\-CONTEXT的功能，它定义在文件 kernel\-/\-machdep.h中。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/machdep.h}
+\label{code:5-10}
+\inputminted[firstline=47,lastline=73,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/machdep.h}
+\end{code}
+
+具体来说，现场是第三章中定义的结构体 context(参考代码\ref{code:3-5})。因为栈是从高地址向下增长，即顺序与结构体 context顺序相反，所以54行先压入线程函数的地址 entry作为 pc。由于线程尚未启动，接下来三个寄存器 svc\_\-lr、 svc\_\-sp和 usr\_\-lr被设置成0， usr\_\-sp填入用户栈 ustack(即用户栈为空)，接下来的 r12～ r1可以填任意值；r0是线程函数的参数，填入pv；然后 spsr告诉线程运行 ARM指令集(而不是 Thumb指令集)、 IRQ和 FIQ分别处于打开和关闭状态， 0x50表示运行在 user模式，而 0x53表示  supervisor模式。72行通过是否有用户栈来判断新创建的线程属于内核级线程 (ustack=0)，或者是用户线程 (ustack!=0)。最后，在内核栈上压入一个符号的地址，即  \&ret\_\-from\_\-svc。这个符号定义在文件  kernel\-/\-entry.S中(见代码\ref{code:5-9}中 213～ 214行)，它用于中断或者异常处理完成之后恢复现场。
+
+\par
+下面来跟踪一下线程的启动过程。线程创建完成后，处于就绪状态。当调度器调度它运行的时候，是从另一个正在运行的线程切换过来的，见代码\ref{code:5-5}和\ref{code:5-6}。也就是说，新线程会在函数 switch\_\-to里面被启动。
+
+\par
+这里只需看代码\ref{code:5-6}。假设变量 new是一个新创建的线程，165和166行相当于“sp=new-\textgreater kstack”，即把 sp指向 new的内核栈，167行把栈顶元素赋值给pc。而此时 new的内核栈顶的元素是  \&ret\_\-from\_\-svc，所以对于新创建的线程 new，167行相当于 pc=\&ret\_\-from\_\-svc，即跳转到 ret\_\-from\_\-svc执行。此时内核栈上的内容由  INIT\_\-TASK\_\-CONTEXT构造，与中断现场的结构完全相同。所以，  ret\_\-from\_\-svc执行中断返回的过程中(即先后执行 EPILOUGE和  PULL\-CONTEXT)，CPU会自动进入 user或者 supervisor模式，并从  INIT\_\-TASK\_\-CONTEXT设置的线程函数  entry开始执行。此时，参数pv已经保存在 r0中，而且 sp也指向了正确的位置。这样就完成了线程的启动过程。
+
+\section{初始化多线程系统}
+准备好了多线程系统的各项工作后，下面调用函数 init\_\-task进行初始化。它的功能比较简单，除了为 g\_\-resched、 g\_\-task\_\-running和 g\_\-task\_\-head三个全局变量设置初值外，调用 sys\_\-task\_\-create创建 task0，即系统空闲线程。 task0是内核级线程，不需要用户栈。创建 task0时的与众不同之处在于此时无法确定线程函数的地址。因此，暂时也填上 NULL，留待将来填充。显然， task0也不需要参数。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/task.c}
+\label{code:5-11}
+\inputminted[firstline=290,lastline=306,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/task.c}
+\end{code}
+
+\noindent
+然后，在函数 cstart中调用 init\_\-task，如代码\ref{code:5-12}所示。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/machdep.c}
+\label{code:5-12}
+\inputminted[firstline=491,lastline=502,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/machdep.c}
+\end{code}
+
+\noindent
+其中， run\_\-as\_\-task0是一个宏，定义于文件 kernel\-/\-machdep.h中，用来填充 task0的线程函数地址并启动它运行。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/machdep.h}
+\label{code:5-13}
+\inputminted[firstline=76,lastline=89,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/machdep.h}
+\end{code}
+
+\noindent
+79～80行相当于“r0=task0-\textgreater kstack”。 81～ 82行把标号1(85行)的地址填入( task0-\textgreater kstack+76)。因为 INIT\_\-TASK\_\-CONTEXT在线程的内核栈上压入了19个数(结构体 context和 \&ret\_\-from\_\-svc，共76字节)，所以(task0-\textgreater kstack+76)指向内核栈上 context结构体的pc字段。也就是说， task0启动后会从标号1的位置开始往下执行。因此，根据代码\ref{code:5-12}， task0启动后会执行503行的空循环。 83～ 84行用于启动 task0：首先把栈切换到 task0的内核栈，然后跳转到 ret\_\-from\_\-svc启动 task0，详细启动流程请参考\ref{section:start-thread}节。
+
+\section{线程退出与等待}
+前面几节讲解了线程的创建、调度和启动等功能。除此之外，内核还要提供一些必备的功能，比如线程退出、等待等。
+
+\par
+先从比较简单的线程退出开始，如代码\ref{code:5-14}所示。在退出之前，先把等待该线程退出的其他线程全部唤醒，然后设置退出代码和状态，最后调用函数schedule让内核调度另一个线程运行。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/task.c}
+\label{code:5-14}
+\inputminted[firstline=205,lastline=222,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/task.c}
+\end{code}
+
+等待线程退出也比较简单。首先要注意的是，我们不允许等待系统空闲线程task0，因为它永远不会退出。其次，等待对象退出后，要回收它的tcb资源。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/task.c}
+\label{code:5-15}
+\inputminted[firstline=224,lastline=265,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/task.c}
+\end{code}
+
+等待和退出中分别用到了函数 sleep\_\-on和 wake\_\-up。它们的参数 head是指向结构体 wait\_\-queue的二级指针，而结构体 wait\_\-queue其实是等待队列的一个节点。因为这两个函数会操纵链表，所以它们必须在中断关闭的环境中运行，以避免竞争条件 (race condition)破坏链表结构。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/kernel.h}
+\label{code:5-16}
+\inputminted[firstline=120,lastline=123,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/kernel.h}
+\end{code}
+
+先看 sleep\_\-on。 72～ 74行把当前线程 g\_\-task\_\-running插入到等待队列的头节点。 76～ 77行把当前线程置为等待状态，然后让调度器运行另一个线程。当函数 schedule返回时，说明该线程已经被唤醒，此时它把自己从等待队列中删除，这就是 79～ 93行代码的功能。
+
+\par
+ wake\_\-up非常简单，就是把等待队列中线程的状态改为就绪即可。
+ 
+\begin{code}
+\captionof{listing}{chapter05/kernel/task.c}
+\label{code:5-17}
+\inputminted[firstline=63,lastline=108,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/task.c}
+\end{code}
+
+\section{测试}
+为了验证多线程系统，来做一个简单的测试，如代码\ref{code:5-18}所示。因为系统还不能进入user模式运行，暂时只能测试内核级线程。
+
+\begin{code}
+\captionof{listing}{chapter05/kernel/machdep.c}
+\label{code:5-18}
+\inputminted[firstline=504,lastline=537,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/machdep.c}
+\end{code}
+
+首先创建两个线程，分别输出字符“A”和“B”各 1000次，然后 task0等待线程 A、 B退出后打印消息，结果如图\ref{figure:5-2}所示。其中，“.”仍然是定时器中断处理函数的输出。可以看出，线程A运行了4次定时器中断后，内核调度了线程B运行，B也运行了4次，如此反复直至结束。这是因为创建线程时给默认分配了4个时间片，即4次定时器中断，如代码\ref{code:5-1}和\ref{code:5-2}所示。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.4]{figures/5-2}
+\caption{多线程测试结果}
+\label{figure:5-2}
+\end{figure}
+
+%\section{缺页异常处理}
+%\subsection{修改栈地址}
+
+\clearpage
+\ifxetex\else\end{CJK*}\fi
+\end{document} 

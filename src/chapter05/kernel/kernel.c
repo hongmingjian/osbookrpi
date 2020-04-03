@@ -1,29 +1,17 @@
 #include "kernel.h"
 #include "board.h"
 
-/*ÖĞ¶ÏÏòÁ¿±í*/
+/*ä¸­æ–­å‘é‡è¡¨*/
 void (*g_intr_vector[NR_IRQ])(uint32_t irq, struct context *ctx);
 
-/*Ä¬ÈÏµÄÖĞ¶Ï´¦Àí³ÌĞò*/
+/*é»˜è®¤çš„ä¸­æ–­å¤„ç†ç¨‹åº*/
 void isr_default(uint32_t irq, struct context *ctx)
 {
-    printk("IRQ=%d\r\n", irq);
+    // do nothing
 }
 
-/*¼ÇÂ¼ÏµÍ³Æô¶¯ÒÔÀ´£¬¶¨Ê±Æ÷ÖĞ¶ÏµÄ´ÎÊı*/
-unsigned volatile g_timer_ticks = 0;
+uint32_t *PTD = (uint32_t *)KERN_MIN_ADDR, //ä¸€çº§é¡µè¡¨çš„æŒ‡é’ˆ
+         *PT  = (uint32_t *)USER_MAX_ADDR; //äºŒçº§é¡µè¡¨çš„æŒ‡é’ˆ
 
-/**
- * ¶¨Ê±Æ÷µÄÖĞ¶Ï´¦Àí³ÌĞò
- */
-void isr_timer(uint32_t irq, struct context *ctx)
-{
-    g_timer_ticks++;
-    sys_putchar('.');
-}
-
-uint32_t *PT  = (uint32_t *)USER_MAX_ADDR, //Ò³±íµÄÖ¸Õë
-         *PTD = (uint32_t *)KERN_MIN_ADDR; //Ò³Ä¿Â¼µÄÖ¸Õë
-		 
-/*¿ÉÓÃµÄÎïÀíÄÚ´æÇøÓò*/
+/*å¯ç”¨çš„ç‰©ç†å†…å­˜åŒºåŸŸ*/
 uint32_t g_ram_zone[RAM_ZONE_LEN];
