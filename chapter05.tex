@@ -107,16 +107,6 @@
 可以看出，全局栈起着临时过渡的作用。多线程系统初始化完成后，内核所有的活动都是在当前线程的内核栈中完成的，包括中断和异常处理。
 
 \par
-当线程在内核中活动时，内核栈的布局如图\ref{figure:5-2}所示。图中顶部的现场是从user模式进入内核时，由 PUSH\-CONTEXT保存、并由 PRO\-LOGUE从全局栈搬过来的。接下来是线程在内核中运行时函数调用过程中所需要的函数参数或局部变量。如果正在处理中断或异常过程中又发生了中断或异常， PUSH\-CONTEXT会继续往下保存现场。最后，当线程被切换出来，即没有运行时，函数 switch\_\-to中保存的状态，也在内核栈上。
-
-\begin{figure}[htp]
-\centering
-\includegraphics[scale=0.4]{figures/5-2}
-\caption{线程内核栈的布局}
-\label{figure:5-2}
-\end{figure}
-
-\par
 接着，我们要修改第三、四章中的 IRQ和 abort处理流程，在 PUSH\-CONTEXT之后、  PULL\-CONTEXT之前分别加入对 PRO\-LOGUE和 EPI\-LOGUE的调用即可，如代码\ref{code:5-9}所示。其中， 213～ 214行的作用，将在\ref{section:start-thread}节中解释。
 
 \begin{code}
@@ -124,6 +114,15 @@
 \label{code:5-9}
 \inputminted[firstline=201,lastline=243,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter05/kernel/entry.S}
 \end{code}
+
+因此，当线程在内核中活动时，内核栈的布局如图\ref{figure:5-2}所示。图中顶部的现场是从user模式进入内核时，由 PUSH\-CONTEXT保存、并由 PRO\-LOGUE从全局栈搬过来的。接下来是线程在内核中运行时函数调用过程中所需要的函数参数或局部变量等。如果正在处理中断或异常过程中又发生了中断或异常， PUSH\-CONTEXT会继续往下保存现场。最后，当线程被切换出来，即没有运行时，函数 switch\_\-to中保存的状态，也在内核栈上。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.4]{figures/5-2}
+\caption{线程内核栈的布局}
+\label{figure:5-2}
+\end{figure}
 
 \section{启动线程}
 \label{section:start-thread}
