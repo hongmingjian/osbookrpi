@@ -34,7 +34,7 @@
 \begin{code}
 \captionof{listing}{chapter05/kernel/task.c}
 \label{code:5-2}
-\inputminted[firstline=162,lastline=202,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/task.c}
+\inputminted[firstline=163,lastline=203,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/task.c}
 \end{code}
 
 \section{线程调度}
@@ -46,7 +46,7 @@
 \begin{code}
 \captionof{listing}{chapter05/kernel/timer.c}
 \label{code:5-3}
-\inputminted[firstline=8,lastline=31,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/timer.c}
+\inputminted[firstline=7,lastline=30,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/timer.c}
 \end{code}
 
 而真正的调度工作，是在函数 schedule中完成的，如代码\ref{code:5-4}所示。其中， 34～ 50行实现了轮转调度算法。 55～ 57行通过 tcb中的 signature检查内核栈是否溢出了，然后调用函数 switch\_\-to切换到线程 select执行。
@@ -66,7 +66,7 @@
 \inputminted[firstline=145,lastline=162,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/machdep.c}
 \end{code}
 
-前半部分的151行把 r0～ r12和 r14压到当前线程的内核栈上， 152～ 153行把标号1(即 168行)的地址也压到栈上， 154～ 155行相当于“ g\_\-task\_\-running-\textgreater kstack=sp”，即把当前栈的位置保存到 tcb的 kstack字段。至此， g\_\-task\_\-running的状态被冻结在它的内核栈上。此时，在当前栈上总共保存了 15*4=60字节， 156行把 sp重置为 151行之前的位置，以保证后面的代码能正常运行。 162行更新 g\_\-task\_\-running指针。
+前半部分的 151～ 152行把 r4～ r11、 cpsr和 r14压到当前线程的内核栈上， 153～ 154行把标号1(即 168行)的地址也压到栈上， 155～ 156行相当于“ g\_\-task\_\-running-\textgreater kstack=sp”，即把当前栈的位置保存到 tcb的 kstack字段。至此， g\_\-task\_\-running的状态被冻结在它的内核栈上。 162行更新 g\_\-task\_\-running指针。
 
 \begin{code}
 \captionof{listing}{chapter05/kernel/machdep.c}
@@ -74,10 +74,10 @@
 \inputminted[firstline=162,lastline=174,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/machdep.c}
 \end{code}
 
-后半部分的 165～ 166行相当于“sp=g\_\-task\_\-running-\textgreater kstack”，即把当前栈切换到线程 new的内核栈， 167行把栈顶元素弹出给 pc。在此之前，线程 new的状态也被 151～ 155行冻结在它的内核栈上，而且栈顶的元素是标号1(即 168行)的地址，所以 167行相当于让 CPU跳到 169行运行。此时栈上的数据正好是由 151行保存的，因此接下来的 169行只是恢复这些寄存器。由于当前栈已经切换到了线程 new的内核栈，所以线程 new在运行了。
+后半部分的 165～ 166行相当于“sp=g\_\-task\_\-running-\textgreater kstack”，即把当前栈切换到线程 new的内核栈， 167行把栈顶元素弹出给 pc。在此之前，线程 new的状态也被 151～ 156行冻结在它的内核栈上，而且栈顶的元素是标号1(即 168行)的地址，所以 167行相当于让 CPU跳到 169行运行。此时栈上的数据正好是由 151～ 152行保存的，因此接下来的 169～ 170行只是恢复这些寄存器。由于当前栈已经切换到了线程 new的内核栈，所以线程 new从函数 switch\_\-to返回，继续运行了。因此，可以说线程切换，本质上就是不同线程之间栈的切换。
 
 \par
-可以看出，线程的切换，本质上就是不同线程之间栈的切换。
+在线程切换过程中，只保存了 r4～ r11、 cpsr、 r14和 sp(即 r13)，其他寄存器不用保存，因为函数调用过程中，只有这几个寄存器是被调用者需要保存的 (callee saved)。
 
 \section{模式切换}
 在线程运行过程中，当中断或异常发生时， CPU可能会发生模式切换，比如从 user模式切换到 IRQ或 abort模式。此时， CPU会跳转到异常向量表中设置的地址去运行。在第三、四章中，通过 PUSH\-CONTEXT和  PULL\-CONTEXT来保存和恢复中断或异常的现场。在 PUSH\-CONTEXT中，无论哪种模式，都把现场保存到 supervisor模式栈，然后切换到 supervisor模式进行后续处理。这个 supervisor模式栈位于 (KERN\-BASE+0x1000-36)，以后称它为全局内核栈。
@@ -135,6 +135,9 @@
 
 \par
 这里只需看代码\ref{code:5-6}。假设变量 new是一个新创建的线程，165和166行相当于“sp=new-\textgreater kstack”，即把 sp指向 new的内核栈，167行把栈顶元素赋值给pc。而此时 new的内核栈顶的元素是  \&ret\_\-from\_\-svc，所以对于新创建的线程 new，167行相当于 pc=\&ret\_\-from\_\-svc，即跳转到 ret\_\-from\_\-svc执行。此时内核栈上的内容由  INIT\_\-TASK\_\-CONTEXT构造，与中断现场的结构完全相同。所以，  ret\_\-from\_\-svc执行中断返回的过程中(即先后执行 EPILOUGE和  PULL\-CONTEXT)，CPU会自动进入 user或者 supervisor模式，并从  INIT\_\-TASK\_\-CONTEXT设置的线程函数  entry开始执行。此时，参数pv已经保存在 r0中，而且 sp也指向了正确的位置。这样就完成了线程的启动过程。
+
+\par
+从上面的过程可以看出，对于新创建的线程，在 switch\_\-to中被启动时，不会去执行 169～ 170行，因为它的内核栈顶的数据是\&ret\_\-from\_\-svc。
 
 \section{初始化多线程系统}
 准备好了多线程系统的各项工作后，下面调用函数 init\_\-task进行初始化。它的功能比较简单，除了为 g\_\-resched、 g\_\-task\_\-running和 g\_\-task\_\-head三个全局变量设置初值外，调用 sys\_\-task\_\-create创建 task0，即系统空闲线程。 task0是内核级线程，不需要用户栈。创建 task0时的与众不同之处在于此时无法确定线程函数的地址。因此，暂时也填上 NULL，留待将来填充。显然， task0也不需要参数。
