@@ -83,10 +83,10 @@
 在线程运行过程中，当中断或异常发生时， CPU可能会发生模式切换，比如从 user模式切换到 IRQ或 abort模式。此时， CPU会跳转到异常向量表中设置的地址去运行。在第三、四章中，通过 PUSH\-CONTEXT和  PULL\-CONTEXT来保存和恢复中断或异常的现场。在 PUSH\-CONTEXT中，无论哪种模式，都把现场保存到 supervisor模式栈，然后切换到 supervisor模式进行后续处理。这个 supervisor模式栈位于 (KERN\-BASE+0x1000-36)，以后称它为全局内核栈。
 
 \par
-内核支持多线程后，不能把所有线程的中断或异常现场都保存在全局栈上。一方面，全局栈的空间比较小，可能导致空间不足；另一方面，也无法区分栈上的现场各自属于哪个线程。考虑到每个线程都有一个接近 4\-KiB 的内核栈(4\-KiB-sizeof(struct tcb))，可以把中断或异常现场放在当前线程的栈上。换句话说，以当前线程的身份去处理中断或者异常，以避免前述的问题。这正是文件 kernel\-/\-entry.S中 PROLOGUE和 EPILOGUE所完成的工作。
+内核支持多线程后，不能把所有线程的中断或异常现场都保存在全局栈上。一方面，全局栈的空间比较小，可能导致空间不足；另一方面，也无法区分栈上的现场各自属于哪个线程。考虑到每个线程都有一个接近 4\-KiB 的内核栈(4\-KiB-sizeof(struct tcb))，可以把中断或异常现场放在当前线程的栈上。换句话说，以当前线程的身份去处理中断或者异常，以避免前述的问题。这正是文件 kernel\-/\-entry.S中 PRO\-LOGUE和 EPI\-LOGUE所完成的工作。
 
 \par
-先来看 PROLOGUE。中断或异常发生时， PUSH\-CONTEXT已经让 CPU运行在 supervisor模式，把现场保存在全局栈中，而且正在这个栈上运行。下面把现场搬到  g\_\-task\_\-running的内核栈。代码\ref{code:5-7}中 77～ 80行判断指针   g\_\-task\_\-running是否有效。如果是无效指针，则表示多线程系统还没有初始化，无法切换到线程的内核栈，仍然在当前栈继续。 82～ 85行判断是否发生了模式切换，如果中断或异常之前已经运行在 supervisor模式，说明已经运行在当前线程的内核栈，没有必要搬运。如果  g\_\-task\_\-running是有效指针，而且从 user模式进来，才需要把现场从当前栈(即全局栈)搬到线程自己的内核栈上，这正是 87～ 95行完成的工作。
+先来看 PRO\-LOGUE。中断或异常发生时， PUSH\-CONTEXT已经让 CPU运行在 supervisor模式，把现场保存在全局栈中，而且正在这个栈上运行。下面把现场搬到  g\_\-task\_\-running的内核栈。代码\ref{code:5-7}中 77～ 80行判断指针   g\_\-task\_\-running是否有效。如果是无效指针，则表示多线程系统还没有初始化，无法切换到线程的内核栈，仍然在当前栈继续。 82～ 85行判断是否发生了模式切换，如果中断或异常之前已经运行在 supervisor模式，说明已经运行在当前线程的内核栈，没有必要搬运。如果  g\_\-task\_\-running是有效指针，而且从 user模式进来，才需要把现场从当前栈(即全局栈)搬到线程自己的内核栈上，这正是 87～ 95行完成的工作。
 
 \begin{code}
 \captionof{listing}{chapter05/kernel/entry.S}
@@ -95,7 +95,7 @@
 \end{code}
 
 \par
-再来看 EPILOGUE，它做与 PROLOGUE相反的工作，即把现场从当前线程的内核栈搬到全局栈，然后在全局栈中统一用 PULL\-CONTEXT恢复并返回。 EPILOGUE要判断是否将返回到 user模式，因为只有发生模式切换时才需要进行搬运。特别注意的是，返回到 user模式运行后，线程的内核栈被清空(也应该是空的)，而且全局栈也回到了初始的位置，即 (KERN\-BASE+0x1000-36)。
+再来看 EPI\-LOGUE，它做与 PRO\-LOGUE相反的工作，即把现场从当前线程的内核栈搬到全局栈，然后在全局栈中统一用 PULL\-CONTEXT恢复并返回。 EPI\-LOGUE要判断是否将返回到 user模式，因为只有发生模式切换时才需要进行搬运。特别注意的是，返回到 user模式运行后，线程的内核栈被清空(也应该是空的)，而且全局栈也回到了初始的位置，即 (KERN\-BASE+0x1000-36)。
 
 \begin{code}
 \captionof{listing}{chapter05/kernel/entry.S}
@@ -107,7 +107,17 @@
 可以看出，全局栈起着临时过渡的作用。多线程系统初始化完成后，内核所有的活动都是在当前线程的内核栈中完成的，包括中断和异常处理。
 
 \par
-接着，我们要修改第三、四章中的 IRQ和 abort处理流程，在 PUSH\-CONTEXT之后、  PULL\-CONTEXT之前分别加入对 PROLOGUE和 EPILOGUE的调用即可，如代码\ref{code:5-9}所示。其中， 213～ 214行的作用，将在\ref{section:start-thread}节中解释。
+当线程在内核中活动时，内核栈的布局如图\ref{figure:5-2}所示。图中顶部的现场是从user模式进入内核时，由 PUSH\-CONTEXT保存、并由 PRO\-LOGUE从全局栈搬过来的。接下来是线程在内核中运行时函数调用过程中所需要的函数参数或局部变量。如果正在处理中断或异常过程中又发生了中断或异常， PUSH\-CONTEXT会继续往下保存现场。最后，当线程被切换出来，即没有运行时，函数 switch\_\-to中保存的状态，也在内核栈上。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.4]{figures/5-2}
+\caption{线程内核栈的布局}
+\label{figure:5-2}
+\end{figure}
+
+\par
+接着，我们要修改第三、四章中的 IRQ和 abort处理流程，在 PUSH\-CONTEXT之后、  PULL\-CONTEXT之前分别加入对 PRO\-LOGUE和 EPI\-LOGUE的调用即可，如代码\ref{code:5-9}所示。其中， 213～ 214行的作用，将在\ref{section:start-thread}节中解释。
 
 \begin{code}
 \captionof{listing}{chapter05/kernel/entry.S}
@@ -120,7 +130,7 @@
 每个线程被创建之后，都会被操作系统调度执行。问题是，线程要从哪里开始执行呢？一般来说，不会是线程函数。因为运行在 supervisor模式的内核没有办法直接运行一个 user模式下面的函数，这中间涉及到模式切换的问题。
 
 \par
-通常的做法是假装新创建的线程刚才被中断了，然后操作系统调度它运行的时候，通过恢复中断现场来启动线程运行。我们知道，当线程被中断的时候，现场由 PUSH\-CONTEXT和 PROLOGUE保存在它的内核栈上。因此，只要在新创建线程的内核栈上模拟一个中断之前的场景即可。这正是代码\ref{code:5-2}中195行的宏 INIT\_\-TASK\_\-CONTEXT的功能，它定义在文件 kernel\-/\-machdep.h中。
+通常的做法是假装新创建的线程刚才被中断了，然后操作系统调度它运行的时候，通过恢复中断现场来启动线程运行。我们知道，当线程被中断的时候，现场由 PUSH\-CONTEXT和 PRO\-LOGUE保存在它的内核栈上。因此，只要在新创建线程的内核栈上模拟一个中断之前的场景即可。这正是代码\ref{code:5-2}中195行的宏 INIT\_\-TASK\_\-CONTEXT的功能，它定义在文件 kernel\-/\-machdep.h中。
 
 \begin{code}
 \captionof{listing}{chapter05/kernel/machdep.h}
@@ -223,13 +233,13 @@
 \inputminted[firstline=501,lastline=537,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter05/kernel/machdep.c}
 \end{code}
 
-首先，task0(run\_\-as\_\-task0()之后的代码都以 task0的身份运行)创建两个线程，分别输出字符“A”和“B”各 1000次，然后等待线程 A、 B退出后打印消息，结果如图\ref{figure:5-2}所示。其中，“.”仍然是定时器中断处理函数的输出。可以看出，线程A运行了4次定时器中断后，内核调度了线程B运行，B也运行了4次，如此反复直至结束。这是因为创建线程时给默认分配了4个时间片，即4次定时器中断，如代码\ref{code:5-1}和\ref{code:5-2}所示。
+首先，task0(run\_\-as\_\-task0()之后的代码都以 task0的身份运行)创建两个线程，分别输出字符“A”和“B”各 1000次，然后等待线程 A、 B退出后打印消息，结果如图\ref{figure:5-3}所示。其中，“.”仍然是定时器中断处理函数的输出。可以看出，线程A运行了4次定时器中断后，内核调度了线程B运行，B也运行了4次，如此反复直至结束。这是因为创建线程时给默认分配了4个时间片，即4次定时器中断，如代码\ref{code:5-1}和\ref{code:5-2}所示。
 
 \begin{figure}[htp]
 \centering
-\includegraphics[scale=0.4]{figures/5-2}
+\includegraphics[scale=0.4]{figures/5-3}
 \caption{多线程测试结果}
-\label{figure:5-2}
+\label{figure:5-3}
 \end{figure}
 
 %\section{缺页异常处理}
