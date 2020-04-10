@@ -79,17 +79,17 @@ void sleep_on(struct wait_queue **head)
     if(*head == &wait)
         *head = wait.next;
     else {
-        struct wait_queue *p, *q;
-        q = *head; p = q->next;
+        struct wait_queue *p, *q = *head;
         do {
+            p = q->next;
             if(p == NULL)
                 break;
             if(p == &wait) {
                 q->next = p->next;
                 break;
             }
-            q = p; p = q->next;
-        } while(1);       
+            q = p;
+        } while(1);
     }
 }
 

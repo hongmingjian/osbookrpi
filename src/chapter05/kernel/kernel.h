@@ -125,6 +125,11 @@ void sleep_on(struct wait_queue **head);
 void wake_up(struct wait_queue **head, int n);
 
 void init_task(void);
-void syscall(struct context *ctx);
-extern void *ret_from_svc;
+struct tcb *sys_task_create(void *tos,
+                            void (*func)(void *pv), void *pv);
+void sys_task_exit(int code_exit);
+int sys_task_wait(int tid, int *pcode_exit);
+int sys_task_getid();
+void sys_task_yield();
+
 #endif /*_KERNEL_H*/

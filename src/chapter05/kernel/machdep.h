@@ -88,4 +88,6 @@ do {                                                 \
             : "r0", "r1");          \
 } while(0)
 
+extern void *ret_from_svc;
+
 #endif /*_MACHDEP_H*/

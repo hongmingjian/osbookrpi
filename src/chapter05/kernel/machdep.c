@@ -477,17 +477,17 @@ void cstart(void)
   }
 
   if(4-4) {
-	int *p = (int *)kmalloc(sizeof(int));
-	printk("kmalloc(sizeof(int)) returns 0x%08x\r\n", p);
-	*p = 0x5a5a5a5a;
-	printk("Its value reads 0x%08x\r\n", *p);
-	kfree(p);
+    int *p = (int *)kmalloc(sizeof(int));
+    printk("kmalloc(sizeof(int)) returns 0x%08x\r\n", p);
+    *p = 0x5a5a5a5a;
+    printk("Its value reads 0x%08x\r\n", *p);
+    kfree(p);
 
     /*将会触发无法处理的缺页异常*/
     p = (int *)0;
     *p = 0;
   }
-  
+
   if(5) {
     /*
      * 初始化多线程子系统
@@ -500,16 +500,16 @@ void cstart(void)
      */
     run_as_task0();
   }
-  
+
   if(5) {
     void tsk_A(void *pv), tsk_B(void *pv);
-    
+
     struct tcb *A = sys_task_create(NULL, tsk_A, (void *)1000);
     struct tcb *B = sys_task_create(NULL, tsk_B, (void *)1000);
-    
+
     sys_task_wait(A->tid, NULL);
     printk("A exited\r\n");
-    sys_task_wait(B->tid, NULL);  
+    sys_task_wait(B->tid, NULL);
     printk("B exited\r\n");
   }
 
@@ -518,20 +518,20 @@ void cstart(void)
 
 void tsk_A(void *pv)
 {
-	int n = (int)pv;
-	while(n) {
-		printk("A");
-		n--;
-	}
-	sys_task_exit(0);
+    int n = (int)pv;
+    while(n) {
+        printk("A");
+        n--;
+    }
+    sys_task_exit(0);
 }
 
 void tsk_B(void *pv)
 {
-	int n = (int)pv;
-	while(n) {
-		printk("B");
-		n--;
-	}
-	sys_task_exit(0);
+    int n = (int)pv;
+    while(n) {
+        printk("B");
+        n--;
+    }
+    sys_task_exit(0);
 }
