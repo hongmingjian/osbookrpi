@@ -1,8 +1,6 @@
 #ifndef _CPU_H
 #define _CPU_H
 
-#include "arch.h"
-
 #define MMIO_BASE_PA   0x20000000
 #define SYS_CLOCK_FREQ 250000000UL
 #define LOADADDR       0x8000
@@ -103,17 +101,6 @@ typedef struct {
 	volatile unsigned int freerunningcounter;
 } armtimer_reg_t;
 
-#define SYSTIMER_REG (0x3000)
-typedef struct {
-	volatile unsigned int cs;
-	volatile unsigned int clo;
-	volatile unsigned int chi;
-	volatile unsigned int c0;
-	volatile unsigned int c1;
-	volatile unsigned int c2;
-	volatile unsigned int c3;
-} systimer_reg_t;
-
 #define INTR_REG (0xB200)
 typedef struct {
 	volatile unsigned int irq_basic_pending;
@@ -127,6 +114,17 @@ typedef struct {
 	volatile unsigned int disable_irqs_2;
 	volatile unsigned int disable_basic_irqs;
 } intr_reg_t;
+
+#define SYSTIMER_REG (0x3000)
+typedef struct {
+	volatile unsigned int cs;
+	volatile unsigned int clo;
+	volatile unsigned int chi;
+	volatile unsigned int c0;
+	volatile unsigned int c1;
+	volatile unsigned int c2;
+	volatile unsigned int c3;
+} systimer_reg_t;
 
 #define EMMC_REG (0x300000)
 typedef struct {

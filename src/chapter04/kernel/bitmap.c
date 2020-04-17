@@ -8,6 +8,8 @@
 #include <string.h>
 #include "bitmap.h"
 
+#include "kernel.h"
+
 #define ASSERT(CONDITION) ((void) 0)
 #define UNUSED __attribute__ ((unused))
 

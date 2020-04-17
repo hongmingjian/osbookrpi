@@ -31,6 +31,7 @@
 // This register allows fine tuning the dma_req generation for paced DMA transfers when reading from the card.
 #include <stdint.h>
 #include <string.h>
+#include "cpu.h"
 #include "kernel.h"
 
 #define SD_OK                0
@@ -1724,12 +1725,12 @@ static int sd_write(struct dev *dp, uint32_t addr, uint8_t *buf, size_t buf_size
 	return buf-oldbuf;
 }
 
-static int sd_poll(struct dev *dp, int events)
+static int sd_poll(struct dev *dp, short events)
 {
 	return 1;
 }
 
-static int sd_ioctl(struct dev *dp, int cmd, void *arg)
+static int sd_ioctl(struct dev *dp, uint32_t cmd, void *arg)
 {
 	return -1;
 }

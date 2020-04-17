@@ -2,13 +2,13 @@
 #define _KERNEL_H
 
 #include <sys/types.h>
+#include <stdarg.h>
 #include <stdint.h>
-#include "board.h"
+
+#include "arch.h"
 #include "machdep.h"
 
 #define MMIO_BASE_VA 0xc4000000
-
-void sys_putchar ( int c );
 
 /*中断向量表*/
 extern void (*g_intr_vector[])(uint32_t irq, struct context *ctx);
@@ -28,8 +28,8 @@ extern unsigned volatile g_timer_ticks;
 void isr_default(uint32_t irq, struct context *ctx);
 void isr_timer(uint32_t irq, struct context *ctx);
 
-void sti(), cli();
-
+int snprintf (char *str, size_t count, const char *fmt, ...);
+int vsnprintf (char *str, size_t count, const char *fmt, va_list arg);
 int printk(const char *fmt,...);
 
 #define RAM_ZONE_LEN (2 * 8)
@@ -141,11 +141,11 @@ struct driver {
                 size_t size);
   int (*write) (struct dev *dp, uint32_t addr, uint8_t *buf,
                 size_t size);
-  int (*poll)  (struct dev *dp, int events);
+  int (*poll)  (struct dev *dp, short events);
 #define POLLIN      0x0001
 #define POLLOUT     0x0004
 
-  int (*ioctl) (struct dev *dp, int cmd, void *arg);
+  int (*ioctl) (struct dev *dp, uint32_t cmd, void *arg);
 };
 
 struct dev {
@@ -173,10 +173,12 @@ struct fs {
                  size_t size);
   int (*write)  (struct file *_fp, uint8_t *buf,
                  size_t size);
-  int (*seek)   (struct file *_fp, int offset, int whence);
+  int (*seek)   (struct file *_fp, off_t offset, int whence);
 #define SEEK_SET    0
 #define SEEK_CUR    1
 #define SEEK_END    2
+
+  int (*ioctl)  (struct file *_fp, uint32_t cmd, void *arg);
 };
 
 struct file {
@@ -187,5 +189,12 @@ struct file {
 #define NR_OPEN_FILE   64
 extern struct fs       *g_fs_vector[];
 extern struct file     *g_file_vector[];
+
+int sys_open(char *path, int mode);
+int sys_close(int fd);
+int sys_read(int fd, uint8_t *buffer, size_t size);
+int sys_write(int fd, uint8_t *buffer, size_t size);
+int sys_seek(int fd, off_t offset, int whence);
+int sys_ioctl(int fd, uint32_t cmd, void *arg);
 
 #endif /*_KERNEL_H*/

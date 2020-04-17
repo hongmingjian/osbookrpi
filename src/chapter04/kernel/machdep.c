@@ -1,10 +1,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "board.h"
+#include "arch.h"
+#include "cpu.h"
 #include "kernel.h"
 
-static void init_uart(uint32_t baud)
+void init_uart(uint32_t baud)
 {
   aux_reg_t *aux = (aux_reg_t *)(MMIO_BASE_VA+AUX_REG);
   gpio_reg_t *gpio = (gpio_reg_t *)(MMIO_BASE_VA+GPIO_REG);
@@ -38,11 +39,11 @@ static void init_uart(uint32_t baud)
   aux->mu_cntl = 3; // enable transmitter & receiver
 }
 
-void sys_putchar ( int c )
+void uart_putc ( int c )
 {
   aux_reg_t *aux = (aux_reg_t *)(MMIO_BASE_VA+AUX_REG);
   while(1) {
-    if(aux->mu_lsr&0x20/*transmitter empty*/)
+    if(aux->mu_lsr&0x20) //Transmitter empty?
       break;
   }
   aux->mu_io = c & 0xff;
@@ -112,17 +113,17 @@ void irq_handler(struct context *ctx)
         return;
     }
   }
-
-  g_intr_vector[irq](irq, ctx);
-
+  
   switch(irq) {
   case 0: {
     armtimer_reg_t *pit = (armtimer_reg_t *)
                           (MMIO_BASE_VA+ARMTIMER_REG);
     pit->irqclear = 1;
     break;
+    }
   }
-  }
+  
+  g_intr_vector[irq](irq, ctx);
 }
 
 /**
@@ -187,7 +188,7 @@ static uint32_t init_paging(uint32_t physfree)
   /*
    * 填充二级页表
    * 映射逻辑地址[0, R(_end)]和[KERNBASE, _end]到
-   * 物理地址[0, R(_end)]
+   * 物理地址为[0, R(_end)]
    */
   for(i = 0; i < (uint32_t)ptpte; i+=PAGE_SIZE)
     pte[i>>PAGE_SHIFT] = i|L2E_V|L2E_W|L2E_C;
@@ -423,7 +424,7 @@ void cstart(void)
     init_uart(115200);
 
     while(*s)
-      sys_putchar(*s++);
+      uart_putc(*s++);
   }
 
   if(3) {

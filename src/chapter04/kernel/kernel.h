@@ -2,13 +2,13 @@
 #define _KERNEL_H
 
 #include <sys/types.h>
+#include <stdarg.h>
 #include <stdint.h>
-#include "board.h"
+
+#include "arch.h"
 #include "machdep.h"
 
 #define MMIO_BASE_VA 0xc4000000
-
-void sys_putchar ( int c );
 
 /*中断向量表*/
 extern void (*g_intr_vector[])(uint32_t irq, struct context *ctx);
@@ -28,8 +28,8 @@ extern unsigned volatile g_timer_ticks;
 void isr_default(uint32_t irq, struct context *ctx);
 void isr_timer(uint32_t irq, struct context *ctx);
 
-void sti(), cli();
-
+int snprintf (char *str, size_t count, const char *fmt, ...);
+int vsnprintf (char *str, size_t count, const char *fmt, va_list arg);
 int printk(const char *fmt,...);
 
 #define RAM_ZONE_LEN (2 * 8)

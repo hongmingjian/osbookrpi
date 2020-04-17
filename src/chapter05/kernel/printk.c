@@ -2,8 +2,6 @@
 #include <sys/types.h>
 #include "kernel.h"
 
-int vsnprintf (char *str, size_t count, const char *fmt, va_list arg);
-
 int printk(const char *fmt,...)
 {
     char buf[128];
@@ -15,7 +13,7 @@ int printk(const char *fmt,...)
     va_end(args);
 
     for(j = 0; j < i; j++)
-        sys_putchar(buf[j]);
+        uart_putc(buf[j]);
 
     return i;
 }

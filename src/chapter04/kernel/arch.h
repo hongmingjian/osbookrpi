@@ -20,17 +20,9 @@
 #ifndef _ARCH_H
 #define _ARCH_H
 
-#include <inttypes.h>
+#include <stdint.h>
 
 #define ROUNDUP(x, y) (((x)+((y)-1))&(~((y)-1)))
-
-extern void invlpg(uint32_t va);
-
-static __inline void
-cpu_idle()
-{
-    __asm__ __volatile__("mcr p15,0,r0,c7,c0,4" : : : "r0");
-}
 
 #define save_flags_cli(flags)					\
 	do {										\
@@ -92,5 +84,11 @@ cpu_idle()
 #define L2E_W   _L2_AP0                   /* Read/Write */
 #define L2E_U   _L2_AP1                   /* User/Supervisor */
 #define L2E_C   (_L2_B|_L2_C)             /* Cacheable */
+
+extern void sti(), cli();
+extern void invlpg(uint32_t page);
+extern void atomic_or (unsigned long *, unsigned long),
+            atomic_xor(unsigned long *, unsigned long),
+            atomic_and(unsigned long *, unsigned long);
 
 #endif /*_ARCH_H*/

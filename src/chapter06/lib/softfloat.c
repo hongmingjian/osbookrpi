@@ -41,7 +41,7 @@ unsigned int __aeabi_uidiv(unsigned int num, unsigned int den)
 }
 
 /**
- * Õâ¸öº¯ÊıÒªÇó¼Ä´æÆ÷r0ÖĞ±£´æÉÌ£¬¼Ä´æÆ÷r1ÖĞ±£´æÓàÊı
+ * è¿™ä¸ªå‡½æ•°è¦æ±‚å¯„å­˜å™¨r0ä¸­ä¿å­˜å•†ï¼Œå¯„å­˜å™¨r1ä¸­ä¿å­˜ä½™æ•°
  */
 unsigned int __aeabi_uidivmod(unsigned int num, unsigned int den)
 {

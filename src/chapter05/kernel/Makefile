@@ -21,7 +21,7 @@ OBJDUMP= $(CROSS)objdump
 PROG=    kernel
 
 #C预处理器的选项
-CPPFLAGS+=-nostdinc -I../include
+CPPFLAGS+=-nostdinc -Iinclude -I../include
 
 #汇编器的选项
 ASFLAGS=-Wall -O2
@@ -32,14 +32,14 @@ CFLAGS+=-Wall -O2 -ffreestanding -fleading-underscore
 #链接器的选项
 LDFLAGS+=-T$(PROG).ld -nostdlib
 
-COBJS=machdep.o timer.o kernel.o printk.o bitmap.o frame.o page.o kmalloc.o task.o
+COBJS=machdep.o kernel.o timer.o printk.o bitmap.o frame.o page.o kmalloc.o task.o
 COBJS+=../lib/tlsf/tlsf.o ../lib/snprintf.o ../lib/string.o \
        ../lib/softfloat.o ../lib/memset.o ../lib/memcpy.o
 
 #entry.o必须是第一个目标文件
 OBJS=entry.o $(COBJS)
 
-all: $(PROG).img
+all: $(PROG).uue
 
 $(PROG).img: $(PROG).elf
 	$(OBJCOPY) $^ -O binary $@

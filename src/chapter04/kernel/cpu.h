@@ -1,8 +1,6 @@
 #ifndef _CPU_H
 #define _CPU_H
 
-#include "arch.h"
-
 #define MMIO_BASE_PA   0x20000000
 #define SYS_CLOCK_FREQ 250000000UL
 #define LOADADDR       0x8000

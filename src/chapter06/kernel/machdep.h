@@ -22,6 +22,9 @@
 
 #include <stdint.h>
 
+void init_uart(uint32_t baud);
+void uart_putc ( int c );
+
 struct context {
     uint32_t spsr;
     uint32_t r0;

@@ -1,5 +1,5 @@
 #include "kernel.h"
-#include "board.h"
+#include "cpu.h"
 
 /*中断向量表*/
 void (*g_intr_vector[NR_IRQ])(uint32_t irq, struct context *ctx);

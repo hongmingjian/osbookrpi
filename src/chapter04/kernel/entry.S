@@ -39,7 +39,7 @@
 #define MODSTK_LR   8
 #define MODSTK_SIZE 12
 
-#define PUSHCONTEXT                     \
+#define PUSHCONTEXT                      \
     sub   lr, lr, #4;                    \
     sub   sp, sp, #MODSTK_SIZE;   /*12*/ \
     str   lr, [sp, #MODSTK_LR];   /* 8*/ \
@@ -72,20 +72,20 @@
     add   sp, sp, #(3*4);                \
     ldmia sp!, {lr, pc}^
 
-    .extern _cstart               @声明cstart是外部符号
-    .extern _edata, _end          @这两个符号在链接器脚本kernel.ld.in中定义
-    .extern _irq_handler          @C语言的中断处理函数
+    .extern _cstart               ;@声明cstart是外部符号
+    .extern _edata, _end          ;@这两个符号在链接器脚本kernel.ld.in中定义
+    .extern _irq_handler          ;@C语言的中断处理函数
 
-    .text                         @代码段开始
-    .globl _entry                 @声明_entry是全局符号
+    .text                         ;@代码段开始
+    .globl _entry                 ;@声明_entry是全局符号
 _entry:
-    ldr pc, vector_reset          @把PC设置为vector_reset处的值,即reset
-    ldr pc, vector_undefined      @把PC设置为vector_undefined处的值
-    ldr pc, vector_swi            @把PC设置为vector_swi处的值
-    ldr pc, vector_prefetch_abort @把PC设置为vector_prefetch_abort处的值
-    ldr pc, vector_data_abort     @把PC设置为vector_data_abort处的值
+    ldr pc, vector_reset          ;@把PC设置为vector_reset处的值,即reset
+    ldr pc, vector_undefined      ;@把PC设置为vector_undefined处的值
+    ldr pc, vector_swi            ;@把PC设置为vector_swi处的值
+    ldr pc, vector_prefetch_abort ;@把PC设置为vector_prefetch_abort处的值
+    ldr pc, vector_data_abort     ;@把PC设置为vector_data_abort处的值
     b   .
-    ldr pc, vector_irq            @把PC设置为vector_irq处的值
+    ldr pc, vector_irq            ;@把PC设置为vector_irq处的值
     b   .
 
 vector_reset:
@@ -113,9 +113,9 @@ reset:
     ldmia r0!, {r2-r9}
     stmia r1!, {r2-r9}
 
-    @ zeroify bss
-    ldr r0, =R(_edata) @BSS段起始和
-    ldr r1, =R(_end)   @           结束地址
+    ;@ zeroify bss
+    ldr r0, =R(_edata) ;@BSS段起始和
+    ldr r1, =R(_end)   ;@           结束地址
     ldr r2, =0x0
 zeroify:
     cmp   r1, r0
@@ -144,7 +144,7 @@ zeroify.1:
     ldr sp, =(0x1000-36)
 
     /* Now enter the C function ... */
-    b _cstart                     @跳转到_cstart执行
+    b _cstart                     ;@跳转到_cstart执行
 
 irq:
     PUSHCONTEXT
@@ -158,8 +158,8 @@ prefetch_abort:
     PUSHCONTEXT
 
     mov r0, sp
-    mrc p15, 0, r1, c6, c0, 2  @get Instruction Fault Address
-    mrc p15, 0, r2, c5, c0, 1  @get Instruction Fault Status
+    mrc p15, 0, r1, c6, c0, 2  ;@get Instruction Fault Address
+    mrc p15, 0, r2, c5, c0, 1  ;@get Instruction Fault Status
 
     bl _abort_handler
 
@@ -170,22 +170,22 @@ data_abort:
     PUSHCONTEXT
 
     mov r0, sp
-    mrc p15, 0, r1, c6, c0, 0   @get Data Fault Address
-    mrc p15, 0, r2, c5, c0, 0   @get Data Fault Status
+    mrc p15, 0, r1, c6, c0, 0   ;@get Data Fault Address
+    mrc p15, 0, r2, c5, c0, 0   ;@get Data Fault Status
 
     bl _abort_handler
 
     PULLCONTEXT
 
     .globl _sti, _cli
-_sti:                           @enable interrupt
+_sti:                           ;@enable interrupt
     stmfd sp!, {r0, lr}
     mrs   r0, cpsr
     bic   r0, r0, #PSR_I
     msr   cpsr_cxsf, r0
     ldmfd sp!, {r0, pc}
 
-_cli:                           @disable interrupt
+_cli:                           ;@disable interrupt
     stmfd sp!, {r0, lr}
     mrs   r0, cpsr
     orr   r0, r0, #PSR_I

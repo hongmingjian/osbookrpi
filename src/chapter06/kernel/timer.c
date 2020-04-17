@@ -10,7 +10,7 @@ unsigned volatile g_timer_ticks = 0;
 void isr_timer(uint32_t irq, struct context *ctx)
 {
     g_timer_ticks++;
-    //sys_putchar('.');
+    //uart_putc('.');
     
     if(g_task_running != NULL) {
         //如果是task0在运行，则强制调度

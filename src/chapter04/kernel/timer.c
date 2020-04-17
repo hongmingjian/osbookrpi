@@ -10,5 +10,5 @@ unsigned volatile g_timer_ticks = 0;
 void isr_timer(uint32_t irq, struct context *ctx)
 {
     g_timer_ticks++;
-    sys_putchar('.');
+    uart_putc('.');
 }

@@ -17,7 +17,9 @@
  *
  */
 #include <stddef.h>
-#include "cpu.h"
+#include <stdint.h>
+
+#include "arch.h"
 #include "../lib/tlsf/tlsf.h"
 
 static tlsf_t g_kheap;

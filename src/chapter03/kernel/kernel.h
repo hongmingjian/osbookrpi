@@ -1,10 +1,11 @@
 #ifndef _KERNEL_H
 #define _KERNEL_H
 
+#include <sys/types.h>
+#include <stdarg.h>
 #include <stdint.h>
-#include "machdep.h"
 
-void sys_putchar ( int c );
+#include "machdep.h"
 
 /*中断向量表*/
 extern void (*g_intr_vector[])(uint32_t irq, struct context *ctx);
@@ -24,5 +25,4 @@ extern unsigned volatile g_timer_ticks;
 void isr_default(uint32_t irq, struct context *ctx);
 void isr_timer(uint32_t irq, struct context *ctx);
 
-void sti(), cli();
 #endif /*_KERNEL_H*/
