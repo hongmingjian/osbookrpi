@@ -75,7 +75,7 @@
 #define PAGE_TRUNCATE(x)  ((x)&(~PAGE_MASK))
 #define PAGE_ROUNDUP(x)   ROUNDUP(x, PAGE_SIZE)
 
-#define L1E_V   (_L1_C_DOM(1)|_L1_TYPE_C) /* D1 = Client */
+#define L1E_V   (_L1_C_DOM(0)|_L1_TYPE_C) /* D0 = Client */
 #define L1E_W   0
 #define L1E_U   0
 #define L1E_C   0

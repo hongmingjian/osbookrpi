@@ -12,4 +12,4 @@ reset:
     ldr sp, =(0x1000)             ;@初始化栈
 
     /* Now enter the C function ... */
-    b _cstart                     ;@跳转到_cstart执行
+    b _cstart                   ;@跳转到_cstart执行

@@ -203,13 +203,13 @@ static uint32_t init_paging(uint32_t physfree)
       "\n\t"
       "mcr p15,0,%2,c3,c0,0 @DACR\n\t"
       "\n\t"
-      "mrc p15,0,r0,c1,c0,0\n\t"
+      "mrc p15,0,r0,c1,c0,0 @SCTLR\n\t"
       "orr r0,r0,%3\n\t"
       "mcr p15,0,r0,c1,c0,0\n\t"
       :
       : "r"(pgdir),
-        "r"(0),        /* Always use TTBR0 */
-        "r"(1<<2),     /* D1=Client, other=No access */
+        "r"(1<<5),     /* Disable TTBR1 */
+        "r"(1),        /* D0=Client, other=No access */
         "r"(1|(1<<23)) /* SCTLR.M=1, SCTLR.XP=1*/
       : "r0"
   );
@@ -258,9 +258,10 @@ int do_page_fault(struct context *ctx, uint32_t vaddr,
                   uint32_t status)
 {
   uint32_t prot;
+  char *fmt="do_page_fault: 0x%08x(0x%08x)\r\n";
 
   if((status & (1<<10))/*FS[4]==1*/) {
-    printk("do_page_fault: 0x%08x(0x%08x)\r\n", vaddr, status);
+    printk(fmt, vaddr, status);
     return -1;
   }
 
@@ -276,13 +277,14 @@ int do_page_fault(struct context *ctx, uint32_t vaddr,
   case 0x7:/*translation fault (page)*/
     break;
   default:
+    printk(fmt, vaddr, status);
     return -1;
   }
 
   /*检查地址是否合法*/
   prot = page_prot(vaddr);
   if(prot == -1 || prot == VM_PROT_NONE) {
-    printk("do_page_fault: 0x%08x(0x%08x)\r\n", vaddr, status);
+    printk(fmt, vaddr, status);
     return -1;
   }
 
@@ -319,7 +321,7 @@ int do_page_fault(struct context *ctx, uint32_t vaddr,
       return 0;
     } else {
       /*物理内存已耗尽*/
-      printk("do_page_fault: 0x%08x(0x%08x)\r\n", vaddr, status);
+      printk(fmt, vaddr, status);
       return -1;
     }
   }

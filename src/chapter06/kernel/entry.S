@@ -194,7 +194,7 @@ zeroify.1:
     ldr sp, =(0x1000-36)
 
     /* Now enter the C function ... */
-    b _cstart                     ;@跳转到_cstart执行
+    b _cstart                   ;@跳转到_cstart执行
 
 irq:
     PUSHCONTEXT
@@ -218,14 +218,14 @@ prefetch_abort:
     PROLOGUE
 
     mov r0, sp
-    mrc p15, 0, r1, c6, c0, 2  ;@get Instruction Fault Address
-    mrc p15, 0, r2, c5, c0, 1  ;@get Instruction Fault Status
+    mrc p15, 0, r1, c6, c0, 2   ;@get Instruction Fault Address
+    mrc p15, 0, r2, c5, c0, 1   ;@get Instruction Fault Status
 
-	bl _sti
+    bl _sti
     bl _abort_handler
     bl _cli
 
-	b _ret_from_svc
+    b _ret_from_svc
 
 data_abort:
     sub     lr, lr, #4
@@ -236,12 +236,11 @@ data_abort:
     mrc p15, 0, r1, c6, c0, 0   ;@get Data Fault Address
     mrc p15, 0, r2, c5, c0, 0   ;@get Data Fault Status
 
-	bl _sti
+    bl _sti
     bl _abort_handler
     bl _cli
 
-	b _ret_from_svc
-
+    b _ret_from_svc
 
     .globl _sti, _cli
 _sti:                           ;@enable interrupt

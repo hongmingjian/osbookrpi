@@ -142,7 +142,7 @@ zeroify.1:
     ldr sp, =(0x1000-36)
 
     /* Now enter the C function ... */
-    b _cstart                     ;@跳转到_cstart执行
+    b _cstart                   ;@跳转到_cstart执行
 
 irq:
     PUSHCONTEXT
