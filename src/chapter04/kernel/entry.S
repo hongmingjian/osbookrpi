@@ -73,19 +73,19 @@
     ldmia sp!, {lr, pc}^
 
     .extern _cstart               ;@声明cstart是外部符号
-    .extern _edata, _end          ;@这两个符号在链接器脚本kernel.ld.in中定义
+    .extern _edata, _end          ;@这两个符号在kernel.ld.in中定义
     .extern _irq_handler          ;@C语言的中断处理函数
 
     .text                         ;@代码段开始
     .globl _entry                 ;@声明_entry是全局符号
 _entry:
-    ldr pc, vector_reset          ;@把PC设置为vector_reset处的值,即reset
-    ldr pc, vector_undefined      ;@把PC设置为vector_undefined处的值
-    ldr pc, vector_swi            ;@把PC设置为vector_swi处的值
-    ldr pc, vector_prefetch_abort ;@把PC设置为vector_prefetch_abort处的值
-    ldr pc, vector_data_abort     ;@把PC设置为vector_data_abort处的值
+    ldr pc, vector_reset          ;@把PC设置为vector_reset处的值
+    ldr pc, vector_undefined
+    ldr pc, vector_swi
+    ldr pc, vector_prefetch_abort
+    ldr pc, vector_data_abort
     b   .
-    ldr pc, vector_irq            ;@把PC设置为vector_irq处的值
+    ldr pc, vector_irq
     b   .
 
 vector_reset:

@@ -525,14 +525,26 @@ void cstart(void)
     extern struct fs     fat_fs, dev_fs;
     extern struct dev    sd_dev;
 
+    printk("task #%d: Initializing SD card...", sys_task_getid());
     g_dev_vector[0] = &sd_dev;
-    g_dev_vector[0]->drv->attach(g_dev_vector[0]);
+    if(g_dev_vector[0]->drv->attach(g_dev_vector[0]))
+      printk("Failed\r\n");
+    else
+      printk("Done\r\n");
 
+    printk("task #%d: Mounting devfs...", sys_task_getid());
     g_fs_vector[0] = &dev_fs;
-    g_fs_vector[0]->mount(g_fs_vector[0], NULL, -1);
+    if(g_fs_vector[0]->mount(g_fs_vector[0], NULL, -1))
+      printk("Failed\r\n");
+    else
+      printk("Done\r\n");
 
+    printk("task #%d: Mounting FAT...", sys_task_getid());
     g_fs_vector[1] = &fat_fs;
-    g_fs_vector[1]->mount(g_fs_vector[1], g_dev_vector[0], -1);
+    if(g_fs_vector[1]->mount(g_fs_vector[1], g_dev_vector[0], -1))
+      printk("Failed\r\n");
+    else
+      printk("Done\r\n");
   }
 
   if(6) {

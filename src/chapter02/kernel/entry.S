@@ -3,7 +3,7 @@
     .text                         ;@代码段开始
     .globl _entry                 ;@声明_entry是全局符号
 _entry:
-    ldr pc, vector_reset          ;@把PC设置为vector_reset处的值,即reset
+    ldr pc, vector_reset          ;@把PC设置为vector_reset处的值
 
 vector_reset:
     .word reset

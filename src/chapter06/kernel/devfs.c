@@ -1,9 +1,9 @@
 #include <string.h>
 #include "kernel.h"
 
-static int devfs_mount(struct fs *this, struct dev *dev, uint32_t addr);
+static int devfs_mount  (struct fs *this, struct dev *dev, uint32_t addr);
 static int devfs_unmount(struct fs *this);
-static int devfs_open(struct fs *this, char *name, int mode, struct file **_fpp);
+static int devfs_open   (struct fs *this, char *name, int mode, struct file **_fpp);
 static int devfs_close  (struct file *_fp);
 static int devfs_read   (struct file *_fp, uint8_t *buf, size_t size);
 static int devfs_write  (struct file *_fp, uint8_t *buf, size_t size);
@@ -28,7 +28,7 @@ struct dev_fs {
   .read    = devfs_read,
   .write   = devfs_write,
   .seek    = devfs_seek,
-  .ioctl = devfs_ioctl
+  .ioctl   = devfs_ioctl
   }
 };
 
@@ -94,10 +94,9 @@ static int devfs_read(struct file *_fp, uint8_t *buf,
 
   int retval = fp->dev->drv->read(fp->dev, fp->pointer,
                                   buf, size);
-  if(retval >= 0) {
+  if(retval >= 0)
     fp->pointer += retval;
-    return retval;
-  }
+
   return retval;
 }
 
@@ -109,10 +108,9 @@ static int devfs_write  (struct file *_fp, uint8_t *buf, size_t size)
 		return -1;
 
 	int retval = fp->dev->drv->write(fp->dev, fp->pointer, buf, size);
-	if(retval >= 0) {
+	if(retval >= 0)
 		fp->pointer += retval;
-		return retval;
-	}
+
 	return retval;
 }
 
