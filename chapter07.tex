@@ -1,0 +1,179 @@
+\documentclass[main.tex]{subfiles}
+\ifxetex\else\onlyinsubfile{\usepackage{CJKutf8}}\fi
+\begin{document}
+\ifxetex\else\begin{CJK*}{UTF8}{song}\fi
+
+\chapter{用户程序与系统调用}
+不知不觉，我们已经完成了许多工作，包括中断和异常处理、内存管理、多线程和文件系统。到目前为止，所有的工作都是在内核中进行的。本章将进入用户模式运行用户程序，而且在用户程序中通过系统调用请求内核的一些功能，比如创建新的用户线程、操作文件等。
+
+\section{启动用户程序}
+在第5章中说过， run\_\-as\_\-task0之后的代码，都是以 task0的身份运行。所以在上一章末尾， task0初始化了 SD卡、挂载 FAT文件系统等。接下来， task0
+会从 FAT的根目录中加载程序文件 a.out，然后创建第一个用户线程执行该程序的函数 main。
+
+\par
+加载 a.out是由函数 load\_\-aout(定义于文件 kernel/elf.c)完成的，一切正常时它会返回程序的入口地址。接着， task0用 page\_\-alloc\_\-in\_\-addr给用户线程准备栈，它位于 USER\_\-MAX\_\-ADDR(=0xbfc0\-0000)，大小 1MiB，也是朝下增长。这里只给栈分配了地址空间，并未分配物理内存。线程运行后，访问栈上的数据时，通过缺页异常自动完成物理内存分配。
+
+\par
+然后调用 sys\_\-create\_\-task创建线程，而且给线程传递 0x2020\-0416作为参数。创建成功后，该用户线程会从 a.out的入口地址开始执行。而 task0会被困在 566～ 567行的循环中无法自拔。
+
+\begin{code}
+\captionof{listing}{chapter07/kernel/machdep.c}
+\label{code:7-1}
+\inputminted[firstline=538,lastline=570,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter07/kernel/machdep.c}
+\end{code}
+
+\section{用户程序}
+用户程序文件 a.out是以 \htmladdnormallink{ELF}{https://elinux.org/Executable_and_Linkable_Format_(ELF)}格式存储的可执行文件。它是为我们的操作系统开发的应用程序，只能保证在这个操作系统上能运行，在其他操作系统中一般是不可执行的。
+
+\par
+首先，新建一个目录 userapp，用于保存用户程序的源文件。因为内核与用户程序基本上是独立的，新建一个目录便于组织文件。它们共享的头文件放在 include目录中，共享的C文件放在目录 lib。 kernel和 userapp目录内部，有各自的 lib或 include目录，如图\ref{figure:7-1}所示。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.5]{figures/7-1.png}
+\caption{项目目录结构}
+\label{figure:7-1}
+\end{figure}
+
+\subsection{userapp/lib/crt0.S}
+文件 crt0.S包含了在函数 main之前运行的启动代码，这正是名字中“0”的意思。 crt是 C Run-Time的缩写，意味着它是 C运行时刻库的一部分。 crt0.S一般在运行用户定义的函数 main之前，做一些初始化的工作，然后调用 main。
+
+\begin{code}
+\captionof{listing}{chapter07/userapp/lib/crt0.S}
+\label{code:7-2}
+\inputminted[linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter07/userapp/lib/crt0.S}
+\end{code}
+
+线程启动时，会从 crt0.S定义的 \_start开始运行。因为这里没有什么初始化工作，所以直接调用 main。传给 \_start的参数，也会通过寄存器 r0传给 main。当 main返回后，调用 task\_\-exit结束线程，而且 main的返回值(在 r0中)也作为 task\_\-exit的参数。
+
+\subsection{userapp/main.c}
+下面来看 main函数。它首先打开串口设备“\$:/uart0”。第一次是以只读模式打开，后面两次以只写模式打开，分别对应于标准输入、输出和出错。此时系统尚未打开文件，所以这三个 open返回的文件描述符一定是 0、1、2。
+
+\begin{code}
+\captionof{listing}{chapter07/userapp/main.c}
+\label{code:7-3}
+\inputminted[firstline=52,lastline=83,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter07/userapp/main.c}
+\end{code}
+
+打开这三个标准文件后，就可以用 printf往串口打印信息了。该函数定义于文件 user\-app\-/lib\-/stdio.c中，它调用 vsn\-printf格式化字符串后，直接用 write把字符串写到标准输出即可。
+
+\par
+接下来， main打印线程号和参数 pv。然后，创建了三个线程 H、A、B。为了简单起见，用全局数组作为线程的栈，因为栈是朝下增长，要给 task\_\-create传递数组末尾的地址。第一个线程H表示 heart\-beat(心跳)，它会让树莓派上名字为 ACT的 LED灯隔一秒钟闪一次，来作为系统的心跳指示。后面两个线程 A、 B与第5章相同，各打印 1000个 A和 B后退出。 main线程等待 A、 B退出后，进入一个无限循环：从标准输入读入一个字符，把它写到标准输出。
+
+\par
+心跳线程H的代码如\ref{code:7-4}所示。它打开设备文件“\$:/led0”，并用 ioctl去开关 LED。
+
+\begin{code}
+\captionof{listing}{chapter07/userapp/main.c}
+\label{code:7-4}
+\inputminted[firstline=35,lastline=50,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter07/userapp/main.c}
+\end{code}
+
+前面代码中的 open、 read、 write、 ioctl、 task\_\-create、 task\_\-getid、 task\_\-wait、 task\_\-exit、 sleep等都是系统调用(system call, syscall)，将在\ref{7-syscall}节中介绍。
+
+\subsection{userapp/Makefile}
+用户程序的 Makefile并没有太多特别之处，这里主要看一下它的链接选项。
+
+\begin{code}
+\captionof{listing}{userapp/Makefile}
+\label{code:7-5}
+\inputminted[firstline=31,lastline=42,linenos,numbersep=5pt,frame=lines,framesep=2mm]{make}{src/chapter07/userapp/Makefile}
+\end{code}
+
+编译选项与内核并没有什么不同，仍然必须是 -ffree\-standing；链接器选项中，也必须是 -nostdlib。而选项“-Wl,-e,\_start,-Ttext,0x00400000”告诉链接器该可执行文件的入口符号是 \_start、代码段(即文本段)的起始地址是 0x0040\-0000(4MiB)。
+
+\par
+函数 load\_\-aout加载程序文件时，会把代码和数据加载到指定的内存地址，然后返回 \_start符号的地址作为线程函数的地址。
+
+\section{系统调用}\label{7-syscall}
+系统调用是操作系统对外提供服务的唯一入口。用户程序在用户模式运行，而内核运行于 supervisor模式。显然，用户程序不能直接调用内核的函数，必须通过模式切换后，在严密监控下进入内核。下面以 open为例，来跟踪系统调用的过程。
+
+\subsection{用户接口}
+当用户调用 open时，先调用了系统调用的用户接口，即 userapp/lib/syscall-wrapper.S。就如名字所表示的，它是系统调用的包裹，把系统调用包裹成C语言可以调用的方式。
+
+\begin{code}
+\captionof{listing}{chapter07/userapp/lib/syscall-wrapper.S}
+\label{code:7-6}
+\inputminted[linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter07/userapp/lib/syscall-wrapper.S}
+\end{code}
+
+它通过宏定义来生成用户接口，除了系统调用的名字和号码不同，其他完全相同。因此，用户接口把方便人类使用的名字，转换成对应的号码。也即是说，用户调用了 open，该宏定义把它转换为20号(=SYS\-CALL\_\-open的)系统调用。
+
+\par
+具体来说，用户接口把 r4备份在栈上，然后把系统调用号码放到 r4中，再用指令 swi进入内核。系统调用返回后，接着运行 swi之后的指令。为什么用 r4存放号码呢？根据 AAPCS (Procedure Call Standard for the ARM Architecture)，函数的前四个参数分别保存在 r0-3中。如果还有更多参数，则通过栈传递。既然 r0-3已经预留给了系统调用的前四个参数，那就用 r4吧。
+
+\par
+系统调用的号码定义在文件 include/syscall-nr.h中，它是内核与用户程序共用的头文件，表示内核与用户程序约定了系统调用的号码。
+
+\begin{code}
+\captionof{listing}{chapter07/include/syscall-nr.h}
+\label{code:7-7}
+\inputminted[firstline=23,lastline=35,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter07/include/syscall-nr.h}
+\end{code}
+
+\subsection{进入内核}
+下面进入内核。指令 swi把 CPU从用户模式切换到内核模式，然后跳转到异常向量表的第3项开始执行。我们在第4章已经打开了 Hi\-Vecs，所以会跳到 0xffff\-0008开始执行。注意，此时内核模式的 sp已经等于 (KER\-NBASE\-+0x1000\--36)。
+
+\par
+先从异常向量表开始。在 vector\_swi处填入标号 swi。
+
+\begin{code}
+\captionof{listing}{chapter07/kernel/entry.S}
+\label{code:7-8}
+\inputminted[firstline=131,lastline=156,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter07/kernel/entry.S}
+\end{code}
+
+标号 swi的定义如\ref{code:7-9}所示，其中 246～ 253行把用户模式的寄存器以 struct context结构保存在全局内核栈上，然后用 PRO\-LOGUE把它复制到当前线程的内核栈，最后调用 C语言函数 syscall进行分发。指令 swi会关闭 CPU的 IRQ中断，因此在进入 syscall前把 IRQ打开，返回后关闭中断。
+
+\begin{code}
+\captionof{listing}{chapter07/kernel/entry.S}
+\label{code:7-9}
+\inputminted[firstline=245,lastline=262,linenos,numbersep=5pt,frame=lines,framesep=2mm]{gas}{src/chapter07/kernel/entry.S}
+\end{code}
+
+\subsection{系统调用的分发}
+函数 syscall根据系统调用的号码，调用相应的功能函数，完成用户的请求。
+
+\par
+因为用户模式的寄存器已经被保存在 ctx中，因此要通过 ctx访问它们，即系统调用号码保存在 ctx-\textgreater r4中，前4个参数保存在 ctx-\textgreater r0-3中。如果有多于4个参数，要用 ctx-\textgreater usr\_sp去用户栈上取。注意，ctx-\textgreater usr\_sp处保存了备份的 r4(见代码\ref{code:7-7})，所以第5个参数的地址是 ctx-\textgreater usr\_sp+4，以此类推。
+
+\begin{code}
+\captionof{listing}{chapter07/kernel/machdep.c}
+\label{code:7-10}
+\inputminted[firstline=573,lastline=599,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter07/kernel/machdep.c}
+\end{code}
+
+\section{串口和LED}
+前面的用户程序中打开了设备文件“\$:/uart0”和“\$:/led0”。下面看看它们在内核中的实现。
+
+\subsection{uart0}
+串口设备 uart0的实现很简单。因为内核已经配置好了串口，这里只要按照第6章的设备接口进行封装即可。
+
+\begin{code}
+\captionof{listing}{chapter07/kernel/uart.c}
+\label{code:7-11}
+\inputminted[firstline=15,lastline=72,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter07/kernel/uart.c}
+\end{code}
+
+\subsection{led0}
+在树莓派电路板上可以找到名字标为 ACT的 LED灯，它连接在某个 GPIO口上。因此，把 GPIO口配置为输出，然后控制电平即可开关。不同版本的树莓派， ACT连接到不同的 GPIO口，而且高低电平定义也不同。所以，结构体 led\_dev中包含了 ACT挂在哪个 GPIO口上，以及高低电平对应的开关信息。
+
+\begin{code}
+\captionof{listing}{chapter07/kernel/led.c}
+\label{code:7-12}
+\inputminted[firstline=20,lastline=80,linenos,numbersep=5pt,frame=lines,framesep=2mm]{c}{src/chapter07/kernel/led.c}
+\end{code}
+
+\section{运行结果}
+本章完成后，运行结果如图\ref{figure:7-2}所示，其中最后一行是键盘输入的字符。除此之外，可以在树莓派上看到 ACT灯在规则闪烁。
+
+\begin{figure}[htp]
+\centering
+\includegraphics[scale=0.5]{figures/7-2.png}
+\caption{运行结果}
+\label{figure:7-2}
+\end{figure}
+
+\clearpage
+\ifxetex\else\end{CJK*}\fi
+\end{document}

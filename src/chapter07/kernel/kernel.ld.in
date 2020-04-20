@@ -1,0 +1,38 @@
+#define LOADADDR 0x8000          //定义加载地址
+#define KERNBASE 0xC0000000
+
+OUTPUT_FORMAT("elf32-littlearm") //链接器的输出文件格式
+OUTPUT_ARCH(arm)
+
+ENTRY(_entry)                    //指定程序入口符号
+SECTIONS {
+  . = LOADADDR+KERNBASE;         //设置加载地址为当前地址
+                                 //后续所有的地址都从这个地址开始
+
+  .text : {                      //代码段
+    *(.text)                     //按照传给链接器的目标文件顺序
+                                 //把所有目标文件的代码都收集在这里
+  }
+
+  . = ALIGN(4);                  //当前地址4字节对齐
+  .rodata : {                    //只读数据段
+    *(.rodata)
+  }
+  .rdata : {                     //ditto
+    *(.rdata)
+  }
+  .data : {                      //可读写数据段(已初始化)
+    *(.data)
+  }
+
+  . = ALIGN(4);
+  _edata = .;                    //定义符号edata等于结束地址
+
+  .bss : {                       //可读写数据段(未初始化)
+    *(.bss)
+    *(COMMON)
+  }
+
+  . = ALIGN(4);
+  _end = .;                      //定义结束符号end
+}
